@@ -4,9 +4,11 @@ __pycache__/
 *$py.class
 *.so
 .Python
+
+# Build / packaging
 build/
-develop-eggs/
 dist/
+develop-eggs/
 downloads/
 eggs/
 .eggs/
@@ -16,31 +18,52 @@ parts/
 sdist/
 var/
 wheels/
+share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
 # Virtual environments
 .venv/
 venv/
+env/
 ENV/
+env.bak/
+venv.bak/
+
+# Env / secrets
+.env
+.env.*
+.envrc
+
+# Testing / coverage / caches
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.cache
+.hypothesis/
+.pyre/
+.pytype/
+
+# Jupyter
+.ipynb_checkpoints/
 
 # IDE / OS
 .idea/
 .vscode/
 .DS_Store
 
-# Env and secrets
-.env
-.env.*
-
-# Testing / coverage
-.pytest_cache/
-.coverage
-htmlcov/
-.mypy_cache/
-.ruff_cache/
-
-# Data downloads (keep sample in repo; ignore large extracts)
+# Data
 data/raw/
 *.zip
+
+# Cursor
+.cursor/
+.cursorignore
+.cursorindexingignore
