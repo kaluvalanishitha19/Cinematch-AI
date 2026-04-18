@@ -28,13 +28,47 @@ def _movielens_root() -> str:
     return root
 
 
+def _load_movielens_dataset(root: str):
+    """Load the prepared dataset or raise ``HTTPException`` (503) with a clear reason."""
+    try:
+        return load_movielens_prepared_cached(root)
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "MovieLens data is not available. "
+                f"Set {_ENV_DIR} to the extracted **ml-latest-small** folder that contains "
+                "`movies.csv` and `ratings.csv` side by side. "
+                f"({exc})"
+            ),
+        ) from None
+    except OSError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "MovieLens data could not be read (permissions or disk error). "
+                f"Check {_ENV_DIR}. ({exc})"
+            ),
+        ) from None
+    except ValueError as exc:
+        # CSV header problems, malformed exports, etc.
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "MovieLens CSVs could not be parsed. "
+                "Confirm you unzipped the official GroupLens archive and pointed "
+                f"{_ENV_DIR} at that folder. ({exc})"
+            ),
+        ) from None
+
+
 @router.get(
     "/recommendations/by-title",
     response_model=MovieLensRecommendByTitleResponse,
 )
 def movielens_recommendations_by_title(title: str, top_k: int = 5) -> MovieLensRecommendByTitleResponse:
     """Content-based neighbors using the prepared MovieLens catalog."""
-    dataset = load_movielens_prepared_cached(_movielens_root())
+    dataset = _load_movielens_dataset(_movielens_root())
     try:
         seed, similar = recommend_movielens_by_title(dataset, title, top_k=top_k)
     except ValueError:

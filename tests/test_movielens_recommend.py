@@ -129,3 +129,29 @@ def test_movielens_api_returns_503_without_data_dir(monkeypatch: pytest.MonkeyPa
         params={"title": "Toy Story"},
     )
     assert response.status_code == 503
+
+
+def test_movielens_api_returns_503_when_data_dir_missing_files(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Bad or missing MovieLens path must be 503, not an unhandled 500."""
+    from fastapi.testclient import TestClient
+
+    from cinematch.main import app
+
+    missing = tmp_path / "no_ml_dataset_here"
+    monkeypatch.setenv("CINEMATCH_MOVIELENS_DIR", str(missing))
+    clear_movielens_cache()
+
+    client = TestClient(app)
+    response = client.get(
+        "/api/movielens/recommendations/by-title",
+        params={"title": "Toy Story"},
+    )
+    clear_movielens_cache()
+
+    assert response.status_code == 503
+    detail = response.json().get("detail", "")
+    assert isinstance(detail, str)
+    assert "MovieLens" in detail or "movies.csv" in detail

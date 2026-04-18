@@ -9,14 +9,63 @@
   <body>
     <header class="site-header">
       <h1>CineMatch AI</h1>
-      <p class="tagline">Movie recommendations — scaffold UI</p>
+      <p class="tagline">Content-based picks from the demo catalog</p>
     </header>
+
     <main class="site-main">
-      <p>
-        The API is available at
-        <a href="/docs">/docs</a>. Recommendation logic will connect here in a
-        later milestone.
-      </p>
+      <section class="search-panel" aria-labelledby="search-heading">
+        <h2 id="search-heading" class="section-title">Find similar movies</h2>
+        <p class="hint">
+          Uses the bundled sample list. Try titles like
+          <span class="hint-examples">Arrival</span>,
+          <span class="hint-examples">Paddington 2</span>, or
+          <span class="hint-examples">Spirited Away</span>.
+        </p>
+
+        <div class="field-row">
+          <label class="field" for="title-input">
+            <span class="field-label">Movie title</span>
+            <input
+              id="title-input"
+              type="search"
+              name="title"
+              autocomplete="off"
+              placeholder="Type a title…"
+            />
+          </label>
+          <label class="field field--narrow" for="topk-input">
+            <span class="field-label">How many</span>
+            <input
+              id="topk-input"
+              type="number"
+              min="1"
+              max="20"
+              value="5"
+              inputmode="numeric"
+            />
+          </label>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn btn-primary" id="search-btn">Recommend</button>
+          <a class="btn btn-ghost" href="/docs">API docs</a>
+        </div>
+      </section>
+
+      <p id="status" class="status" role="status" aria-live="polite" hidden></p>
+
+      <section id="results" class="results" hidden>
+        <div class="seed-card">
+          <p class="seed-label">Your movie</p>
+          <p class="seed-title" id="seed-title"></p>
+          <p class="seed-meta" id="seed-meta"></p>
+        </div>
+
+        <h2 class="section-title section-title--compact">Similar titles</h2>
+        <ul id="rec-list" class="rec-list"></ul>
+      </section>
     </main>
+
+    <script src="/static/js/recommendations.js" defer></script>
   </body>
 </html>

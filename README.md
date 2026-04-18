@@ -12,10 +12,11 @@
 4. [How TF–IDF recommendations work](#how-tf-idf-recommendations-work)  
 5. [API reference](#api-reference)  
 6. [Setup and run](#setup-and-run)  
-7. [Testing and quality](#testing-and-quality)  
-8. [Suggested screenshots and sample output](#suggested-screenshots-and-sample-output)  
-9. [Roadmap](#roadmap)  
-10. [License](#license)
+7. [Web UI](#web-ui)  
+8. [Testing and quality](#testing-and-quality)  
+9. [Suggested screenshots and sample output](#suggested-screenshots-and-sample-output)  
+10. [Roadmap](#roadmap)  
+11. [License](#license)
 
 ---
 
@@ -36,7 +37,7 @@
 - **`cinematch.data`** — Load and clean data (`loader`, `pipeline`, `preprocess`), plus a **`movielens`** subpackage for MovieLens CSV layout, merges, and optional LRU **cache**.  
 - **`cinematch.recommend`** — Pure recommendation helpers: demo **`content`** (overview + genres) and **`movielens_content`** (title + genres + year + rating summaries).  
 - **`cinematch.api`** — HTTP routers under `/api` (demo catalog) and `/api/movielens` (MovieLens-backed route).  
-- **`cinematch.static`** — Minimal placeholder UI at `/`.
+- **`cinematch.static`** — Single-page UI at `/` (search + results) calling the demo recommendations API.
 
 ---
 
@@ -99,7 +100,7 @@ Uses **`CINEMATCH_DATA_CSV`** if set, otherwise **`data/sample_movies.csv`**.
 
 ### MovieLens catalog (`/api/movielens` …)
 
-Requires **`CINEMATCH_MOVIELENS_DIR`** pointing at a folder with `movies.csv` and `ratings.csv`. Returns **`503`** if the variable is unset.
+Requires **`CINEMATCH_MOVIELENS_DIR`** pointing at a folder that contains **`movies.csv`** and **`ratings.csv`** next to each other (same layout as GroupLens **ml-latest-small**). Returns **`503`** if the variable is unset, the path is missing, or the CSVs cannot be read or parsed.
 
 | Method | Path | Query params | Description |
 |--------|------|--------------|-------------|
@@ -174,15 +175,43 @@ pip install -e ".[dev]"
 uvicorn cinematch.main:app --reload --app-dir src
 ```
 
-- **UI placeholder:** [http://127.0.0.1:8000](http://127.0.0.1:8000)  
+- **Web app:** [http://127.0.0.1:8000](http://127.0.0.1:8000)  
 - **API docs:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
-**Optional — MovieLens directory**
+---
+
+## Web UI
+
+The home page (`/`) is a small **vanilla HTML/CSS/JS** client (no build step). It calls **`GET /api/recommendations/by-title`** on the **demo catalog** (`data/sample_movies.csv` or `CINEMATCH_DATA_CSV`). It shows:
+
+- the **seed** title and catalog id prominently, and  
+- a **list** of recommended movies (year, genres, short overview).
+
+Empty search shows an inline message; **404** / **400** responses show the API `detail` text. The MovieLens-only route is still available at `/api/movielens/...` for API clients; the browser UI does not call it yet.
+
+**MovieLens (ml-latest-small) for `/api/movielens/...`**
+
+1. **Download** the official dataset from GroupLens: open **[MovieLens Latest Datasets](https://grouplens.org/datasets/movielens/latest/)** and download **ml-latest-small** (direct link to the zip is also listed there as `ml-latest-small.zip`).  
+2. **Unzip** the archive. You should get a folder named **`ml-latest-small`** whose **immediate children** include `movies.csv` and `ratings.csv` (same directory level—not buried under an extra nested folder).  
+3. **Point the app** at that folder. Prefer an **absolute path** so it still works after you `cd`:
 
 ```bash
 export CINEMATCH_MOVIELENS_DIR="/absolute/path/to/ml-latest-small"
-# same shell, then start uvicorn as above
+uvicorn cinematch.main:app --reload --app-dir src
 ```
+
+If the path is wrong or the CSVs are missing, `/api/movielens/recommendations/by-title` responds with **`503`** and a JSON `detail` string explaining that `movies.csv` / `ratings.csv` were not found or could not be parsed.
+
+**Developer / CI quick path (tiny fixture)**
+
+The repo includes **`tests/fixtures/movielens/`** with minimal `movies.csv` and `ratings.csv` for automated tests. You can point your shell at it while developing the MovieLens API (titles in that file include **Toy Story**):
+
+```bash
+export CINEMATCH_MOVIELENS_DIR="$(pwd)/tests/fixtures/movielens"
+uvicorn cinematch.main:app --reload --app-dir src
+```
+
+**Uvicorn entrypoint:** use `cinematch.main:app` with `--app-dir src` (not `src.cinematch.api.main`), so imports match this repository layout.
 
 **Optional — custom demo CSV**
 
@@ -209,7 +238,7 @@ Add these under **`docs/images/`** (create the folder when you have assets) and 
 1. **Swagger UI** — `http://127.0.0.1:8000/docs` showing the `/api/recommendations/by-title` and `/api/movielens/recommendations/by-title` operations expanded.  
 2. **Terminal sample** — A short session: `curl` call + pretty-printed JSON (or `httpie` / `jq`), demonstrating a 200 response and one error case (`404` or `503`).  
 3. **Architecture** (optional) — A simple diagram: CSV → preprocess → TF–IDF → FastAPI → client.  
-4. **Placeholder UI** (optional) — Screenshot of `/` if you later replace it with a real browse-and-recommend page.
+4. **Web UI** — Screenshot of `/` with search, seed movie, and recommendation list.
 
 You can paste the same **example JSON** blocks above into the repo as **`.json` examples** under `docs/examples/` if you want copy-paste fixtures without maintaining screenshots.
 
