@@ -1,52 +1,228 @@
-# Cinematch-AI
+# CineMatch AI
 
-AI-powered movie recommendation system with content-based filtering, collaborative filtering, and explainable suggestions.
+**FastAPI + scikit-learn** portfolio project: load movie catalogs, preprocess **MovieLens-style** CSVs, and serve **content-based** recommendations with **TF–IDF** and **cosine similarity**. The codebase is split into small modules (data loading, preprocessing, recommendation, HTTP) so it is easy to extend toward **collaborative filtering** or a richer UI later.
 
-## Data loading and preprocessing
+---
 
-CSV columns required: `id`, `title`, `year`, `genres`, `overview`.
+## Table of contents
 
-| Module | Role |
-|--------|------|
-| `cinematch.data.loader` | Resolve path (`CINEMATCH_DATA_CSV` or `data/sample_movies.csv`), read UTF-8 CSV with BOM support, validate header. |
-| `cinematch.data.pipeline` | Turn raw row dicts into `Movie` objects, dedupe by `id`, sort by id. |
-| `cinematch.data.preprocess` | Trim/normalize text, parse genres and years, build each `Movie`. |
-| `cinematch.data.schema` | Pydantic `Movie` model (`genres` as a list). |
-| `cinematch.data.movielens` | MovieLens `movies.csv` + `ratings.csv` → `PreparedMovieLensDataset`. |
+1. [Project overview](#project-overview)  
+2. [Architecture](#architecture)  
+3. [MovieLens preprocessing](#movielens-preprocessing)  
+4. [How TF–IDF recommendations work](#how-tf-idf-recommendations-work)  
+5. [API reference](#api-reference)  
+6. [Setup and run](#setup-and-run)  
+7. [Testing and quality](#testing-and-quality)  
+8. [Suggested screenshots and sample output](#suggested-screenshots-and-sample-output)  
+9. [Roadmap](#roadmap)  
+10. [License](#license)
 
-Default sample file: `data/sample_movies.csv`.
+---
 
-## MovieLens-style dataset (movies + ratings)
+## Project overview
 
-For collaborative or hybrid recommenders, use the same layout as **MovieLens** CSV exports (for example **ml-latest-small**):
+| | |
+|--|--|
+| **Goal** | Demonstrate an end-to-end ML-adjacent service: validated data ingestion, text vectorization, ranking, and a documented HTTP API. |
+| **What ships today** | Two **content-based** paths: a **demo CSV** (bundled sample) and an optional **MovieLens** export (`movies.csv` + `ratings.csv`). |
+| **What is out of scope (for now)** | User accounts, training pipelines, collaborative filtering, and production deployment hardening. |
+
+**Stack:** Python 3.11+, FastAPI, Pydantic v2, Uvicorn, scikit-learn, pytest.
+
+---
+
+## Architecture
+
+- **`cinematch.data`** — Load and clean data (`loader`, `pipeline`, `preprocess`), plus a **`movielens`** subpackage for MovieLens CSV layout, merges, and optional LRU **cache**.  
+- **`cinematch.recommend`** — Pure recommendation helpers: demo **`content`** (overview + genres) and **`movielens_content`** (title + genres + year + rating summaries).  
+- **`cinematch.api`** — HTTP routers under `/api` (demo catalog) and `/api/movielens` (MovieLens-backed route).  
+- **`cinematch.static`** — Minimal placeholder UI at `/`.
+
+---
+
+## MovieLens preprocessing
+
+MovieLens exports (for example **ml-latest-small**) use two files in one directory:
 
 ```text
 your-ml-folder/
-  movies.csv    # movieId,title,genres
-  ratings.csv   # userId,movieId,rating,timestamp
+  movies.csv     # movieId, title, genres (genres separated by |)
+  ratings.csv    # userId, movieId, rating, timestamp
 ```
 
-Load and preprocess in Python:
+**End-to-end flow** (see `cinematch.data.movielens`):
 
-```python
-from pathlib import Path
-from cinematch.data.movielens import load_prepared_movielens
+1. **Read CSVs** — UTF-8 with optional BOM; required columns are validated on the header.  
+2. **Clean movies** — Skip rows with empty `movieId` or empty display title. Genres split on `|`; `(no genres listed)` becomes an empty list. Titles like `Toy Story (1995)` become display title plus parsed **year** when the trailing `(YYYY)` pattern matches.  
+3. **Clean ratings** — Skip rows with missing ids or ratings; ratings must parse as floats in **0.5–5.0** (MovieLens scale). Bad or empty timestamps become `null` in the model rather than failing the whole file.  
+4. **Align ids** — Drop ratings whose `movieId` never appears in `movies.csv` (orphans).  
+5. **Aggregate** — For each movie, compute **mean rating** and **rating count** from the surviving ratings; movies with no ratings keep `mean_rating` unset and `rating_count` at zero.  
+6. **Catalog hygiene** — Duplicate `movieId` rows keep the **first** occurrence; movies are sorted by numeric id when possible.
 
-dataset = load_prepared_movielens(Path("path/to/ml-latest-small"))
-# dataset.movies -> MLMovie rows with mean_rating / rating_count filled when ratings exist
-# dataset.ratings -> cleaned MLRating rows (orphans removed)
+Load in code with `load_prepared_movielens(Path("…"))` or set **`CINEMATCH_MOVIELENS_DIR`** to that folder (also used by the MovieLens API route and the LRU cache).
+
+---
+
+## How TF–IDF recommendations work
+
+Both recommenders follow the same pattern; only the **text fed into TF–IDF** changes.
+
+1. **Document** — Each movie becomes one string (see `movie_to_document` vs `ml_movie_to_document`).  
+2. **Vectorize** — `TfidfVectorizer` (scikit-learn) with English **stop words** removed, **`min_df=1`** so small catalogs still work, and **`ngram_range=(1, 2)`** so single words and short phrases both contribute.  
+3. **Score** — **Cosine similarity** compares the seed movie’s vector to every other movie’s vector.  
+4. **Rank** — Sort by similarity, skip the seed, return the top **`top_k`**.
+
+| Mode | Source rows | Document text roughly contains |
+|------|----------------|----------------------------------|
+| **Demo catalog** | `Movie` from `data/sample_movies.csv` | Genres + **overview** body copy. |
+| **MovieLens catalog** | `MLMovie` after preprocessing | **Title**, **genres**, **year**, and optional tokens derived from **mean rating** and **rating count** (so popularity-ish signal can influence word overlap). |
+
+This is **content-based**, not personalized from a user’s full rating history: similar movies are those whose *text profile* is close to the seed. Collaborative filtering would use the `ratings` table directly; that is a natural next step, not implemented here.
+
+---
+
+## API reference
+
+Interactive docs: **`http://127.0.0.1:8000/docs`** (Swagger UI).
+
+### Demo catalog (`/api` …)
+
+Uses **`CINEMATCH_DATA_CSV`** if set, otherwise **`data/sample_movies.csv`**.
+
+| Method | Path | Query / path params | Description |
+|--------|------|----------------------|-------------|
+| `GET` | `/api/health` | — | `{ "status": "ok" }` |
+| `GET` | `/api/movies` | — | List all movies. |
+| `GET` | `/api/movies/{movie_id}` | path: `movie_id` | One movie; `404` if missing. |
+| `GET` | `/api/recommendations` | `movie_id` (required), `top_k` default `5` | Similar movies by id. |
+| `GET` | `/api/recommendations/by-title` | `title` (required), `top_k` default `5` | Match title (case-insensitive, trimmed); `400` empty title; `404` no match. |
+
+### MovieLens catalog (`/api/movielens` …)
+
+Requires **`CINEMATCH_MOVIELENS_DIR`** pointing at a folder with `movies.csv` and `ratings.csv`. Returns **`503`** if the variable is unset.
+
+| Method | Path | Query params | Description |
+|--------|------|--------------|-------------|
+| `GET` | `/api/movielens/recommendations/by-title` | `title` (required), `top_k` default `5` | Content-based neighbors from the prepared MovieLens movie table. |
+
+### Example: demo recommendations by title
+
+**Request**
+
+```http
+GET /api/recommendations/by-title?title=Arrival&top_k=2
 ```
 
-Or set `CINEMATCH_MOVIELENS_DIR` to that folder and call `load_prepared_movielens()` with no arguments.
+**Example response** (shape from the bundled sample; exact neighbors depend on TF–IDF scores)
 
-**Cleaning rules (short):** drop movie rows with empty ids or titles; split genres on `|` and treat `(no genres listed)` as empty; parse `Title (YYYY)` into display title + year; drop ratings with missing ids, non-numeric ratings, or values outside **0.5–5.0**; drop ratings whose `movieId` is not in `movies.csv`; attach **mean rating** and **count** per movie.
+```json
+{
+  "seed_title": "Arrival",
+  "seed_movie_id": "2",
+  "recommendations": [
+    {
+      "id": "5",
+      "title": "Mad Max Fury Road",
+      "year": 2015,
+      "genres": ["Action", "Adventure", "Sci-Fi"],
+      "overview": "Survivors flee across a desert wasteland pursued by a warlord and his army."
+    }
+  ]
+}
+```
 
-### MovieLens content recommendations (API)
+### Example: MovieLens recommendations by title
 
-With `CINEMATCH_MOVIELENS_DIR` set to a prepared MovieLens folder:
+**Request** (after `export CINEMATCH_MOVIELENS_DIR=…`)
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/movielens/recommendations/by-title` | Query `title` (required), `top_k` (default `5`). TF–IDF over title, genres, year, and light rating-summary text. Returns `503` if the env var is missing. |
+```http
+GET /api/movielens/recommendations/by-title?title=Toy%20Story&top_k=3
+```
 
-The smaller **demo** catalog (`/api/recommendations/...`) is unchanged and does not require MovieLens files.
+**Example response** (fields reflect `MLMovie`; list truncated for readability)
+
+```json
+{
+  "seed_movie_id": "1",
+  "seed_title": "Toy Story",
+  "recommendations": [
+    {
+      "movie_id": "…",
+      "title": "…",
+      "year": 1995,
+      "genres": ["Adventure", "Animation", "Children"],
+      "mean_rating": 3.89,
+      "rating_count": 57309
+    }
+  ]
+}
+```
+
+Exact `recommendations` depend on your MovieLens slice and TF–IDF scores.
+
+---
+
+## Setup and run
+
+**Prerequisites:** Python **3.11+**, `pip`, and optionally a MovieLens **ml-latest-small** (or compatible) unzip for the `/api/movielens` route.
+
+```bash
+cd cinematch-ai
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
+uvicorn cinematch.main:app --reload --app-dir src
+```
+
+- **UI placeholder:** [http://127.0.0.1:8000](http://127.0.0.1:8000)  
+- **API docs:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+**Optional — MovieLens directory**
+
+```bash
+export CINEMATCH_MOVIELENS_DIR="/absolute/path/to/ml-latest-small"
+# same shell, then start uvicorn as above
+```
+
+**Optional — custom demo CSV**
+
+```bash
+export CINEMATCH_DATA_CSV="/path/to/your_movies.csv"
+# columns: id, title, year, genres, overview
+```
+
+---
+
+## Testing and quality
+
+```bash
+pytest
+ruff check src tests
+```
+
+---
+
+## Suggested screenshots and sample output
+
+Add these under **`docs/images/`** (create the folder when you have assets) and link them from this README—recruiters often skim visuals first.
+
+1. **Swagger UI** — `http://127.0.0.1:8000/docs` showing the `/api/recommendations/by-title` and `/api/movielens/recommendations/by-title` operations expanded.  
+2. **Terminal sample** — A short session: `curl` call + pretty-printed JSON (or `httpie` / `jq`), demonstrating a 200 response and one error case (`404` or `503`).  
+3. **Architecture** (optional) — A simple diagram: CSV → preprocess → TF–IDF → FastAPI → client.  
+4. **Placeholder UI** (optional) — Screenshot of `/` if you later replace it with a real browse-and-recommend page.
+
+You can paste the same **example JSON** blocks above into the repo as **`.json` examples** under `docs/examples/` if you want copy-paste fixtures without maintaining screenshots.
+
+---
+
+## Roadmap
+
+- Collaborative or hybrid models using `PreparedMovieLensDataset.ratings`.  
+- Posters / metadata via TMDB (with caching and API key config).  
+- Docker and CI (GitHub Actions) for install + `pytest` on push.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
