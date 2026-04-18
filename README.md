@@ -165,7 +165,7 @@ Exact `recommendations` depend on your MovieLens slice and TF–IDF scores.
 
 ## Setup and run
 
-**Prerequisites:** Python **3.11+**, `pip`, and optionally a MovieLens **ml-latest-small** (or compatible) unzip if you want the **MovieLens Library** path in the UI and `/api/movielens/...` (recommended for anything beyond the tiny bundled sample).
+**Prerequisites:** Python **3.11+**, `pip`, and optionally a MovieLens **ml-latest-small** (or compatible) unzip if you want the **Full Movie Library** option in the UI (backed by `/api/movielens/...`) in addition to the bundled quick demo.
 
 ```bash
 cd cinematch-ai
@@ -182,19 +182,19 @@ uvicorn cinematch.main:app --reload --app-dir src
 
 ## Web UI
 
-The home page (`/`) is a **vanilla HTML/CSS/JS** client (no build step) with a **theater-style** layout: spotlight hero, popcorn motif, film-strip accents, ticket “quick pick” chips, a large search bar, and **poster-style** cards. Each card uses **CSS gradients and a monogram placeholder** (no copyrighted poster art). Catalog choice and how many picks to show live under **Fine-tune your night**. The same JSON APIs power the experience:
+The home page (`/`) is a **vanilla HTML/CSS/JS** client (no build step) with a **theater-style** layout: spotlight hero, popcorn motif, film-strip accents, ticket “quick pick” chips, a large search bar, and **ticket-style recommendation cards** (title, year, genres, optional ratings, short tag line). There are **no poster images or poster-shaped placeholders**—only typography and layout. In the UI, **Quick Demo** vs **Full Movie Library** (and how many picks to show) live under a small **More options** disclosure—copy stays consumer-friendly; **dataset and server setup are documented only here**, not in the main page.
 
-| Mode | API used | What you see |
-|------|------------|----------------|
-| **Sample Movies** | `GET /api/recommendations/by-title` | A **small fixed demo** (`data/sample_movies.csv` or `CINEMATCH_DATA_CSV`). Recommendation lists are **short by design**—the UI explains that so the experience still feels intentional. |
-| **MovieLens Library** | `GET /api/movielens/recommendations/by-title` | **Recommended for “real app” testing**: thousands of titles, **genres, year, ids**, and optional **mean rating / count** (MovieLens has no plot field in the CSV). |
+| UI label | API used | What you see |
+|----------|------------|----------------|
+| **Quick Demo** | `GET /api/recommendations/by-title` | A **small fixed demo** (`data/sample_movies.csv` or `CINEMATCH_DATA_CSV`). Lists are **short by design**. |
+| **Full Movie Library** | `GET /api/movielens/recommendations/by-title` | Large catalog when **`CINEMATCH_MOVIELENS_DIR`** points at **ml-latest-small** (see below): genres, year, ids, optional **mean rating / count** (MovieLens CSV has no plot field). |
 
-**Choosing a catalog**
+**Choosing a catalog (technical)**
 
-- **Sample Movies** — Ships with the repo; only **six titles**. Quick picks match those rows exactly. Use it for a fast demo without downloading data.  
-- **MovieLens Library (recommended)** — Point **`CINEMATCH_MOVIELENS_DIR`** at an extracted **ml-latest-small** folder (see below). Quick picks use well-known **1995** titles from that dataset. If the variable is not set, the UI shows a **short, non-technical notice** and blocks searches in MovieLens mode until you configure the server or switch back to Sample Movies (setup steps stay in this README only).
+- **Quick Demo** — Bundled **six-title** CSV; quick picks match those rows.  
+- **Full Movie Library** — Requires **`CINEMATCH_MOVIELENS_DIR`** and an extracted **ml-latest-small** folder (see below). If that path is not configured or the server returns **503**, the UI **falls back to Quick Demo** for the same search and shows a short, non-technical message—users are not asked to fix environment variables on the home page.
 
-Empty search shows an inline message. **404** and **503** use friendly copy in the marquee (including guidance to try Sample Movies when MovieLens is unavailable). Your last source choice is remembered for the browser tab (**sessionStorage**).
+Empty search shows an inline message. **404** uses friendly copy in the marquee. Your last source choice is remembered for the browser tab (**sessionStorage**).
 
 ### Downloading MovieLens **ml-latest-small** (recommended)
 
@@ -210,7 +210,7 @@ export CINEMATCH_MOVIELENS_DIR="/absolute/path/to/ml-latest-small"
 uvicorn cinematch.main:app --reload --app-dir src
 ```
 
-5. In the web UI, open **Fine-tune your night** → choose **MovieLens Library (recommended)** → use quick picks or search (e.g. **Toy Story (1995)**).
+5. In the web UI, open **More options** → choose **Full Movie Library** → use quick picks or search (e.g. **Toy Story (1995)**).
 
 If the path is wrong or the CSVs are missing, `/api/movielens/recommendations/by-title` responds with **`503`** and a JSON `detail` string explaining that `movies.csv` / `ratings.csv` were not found or could not be parsed.
 
@@ -251,9 +251,9 @@ Add these under **`docs/images/`** (create the folder when you have assets) and 
 2. **Terminal sample** — A short session: `curl` call + pretty-printed JSON (or `httpie` / `jq`), demonstrating a 200 response and one error case (`404` or `503`).  
 3. **Architecture** (optional) — A simple diagram: CSV → preprocess → TF–IDF → FastAPI → client.  
 4. **Web UI (desktop)** — Save as `assets/ui-demo.png`: full `/` page with theater hero, popcorn, search bar, and ticket quick-picks.  
-5. **Web UI (results)** — Save as `assets/movie-results.png`: “Because you searched for…” line, spotlight seed poster, and poster-style recommendation grid.  
-6. **Web UI (mobile)** — Narrow viewport showing stacked posters and the search card.  
-7. **Error states** — Optional captures of the marquee alert for **404** (“We couldn’t find…”) and **503** (“The full movie library…”) when MovieLens is unavailable.
+5. **Web UI (results)** — Save as `assets/movie-results.png`: “Because you searched for…” line, your-pick ticket card, and stacked recommendation info cards.  
+6. **Web UI (mobile)** — Narrow viewport showing stacked ticket cards and the search card.  
+7. **Error states** — Optional capture of the **404** marquee (“We couldn’t find…”), or the brief info line when the app **falls back to Quick Demo** after the full library is unavailable.
 
 You can paste the same **example JSON** blocks above into the repo as **`.json` examples** under `docs/examples/` if you want copy-paste fixtures without maintaining screenshots.
 
@@ -262,7 +262,7 @@ You can paste the same **example JSON** blocks above into the repo as **`.json` 
 ## Roadmap
 
 - Collaborative or hybrid models using `PreparedMovieLensDataset.ratings`.  
-- Integrate TMDB API for real movie posters and metadata.  
+- Integrate TMDB API for artwork, cast, and richer metadata.  
 - Docker and CI (GitHub Actions) for install + `pytest` on push.
 
 ---

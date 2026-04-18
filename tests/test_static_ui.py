@@ -22,13 +22,17 @@ def test_home_page_serves_ui_shell() -> None:
     assert 'value="movielens"' in body
     assert "/static/js/recommendations.js" in body
     assert "Get Recommendations" in body
-    assert 'id="library-hint"' in body
-    assert 'id="movielens-setup-note"' in body
+    assert 'class="more-options"' in body
+    assert "More options" in body
+    assert "Quick Demo" in body
+    assert "Full Movie Library" in body
     assert 'id="results-catalog-note"' in body
     assert "The Grand Budapest Hotel" in body
-    assert "MovieLens Library (recommended)" in body
     assert "Toy Story (1995)" in body
     assert "Jumanji (1995)" in body
+    assert 'class="film-card film-card--seed' in body
+    assert 'id="seed-genres"' in body
+    assert 'class="film-divider"' in body
 
 
 def test_static_js_wires_demo_and_movielens_apis() -> None:
@@ -41,3 +45,4 @@ def test_static_js_wires_demo_and_movielens_apis() -> None:
     assert "setLoadingState" in text
     assert "sessionStorage" in text
     assert "___cinematch_probe___" in text
+    assert "The full library is unavailable right now. Showing quick demo recommendations instead." in text

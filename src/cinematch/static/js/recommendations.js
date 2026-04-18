@@ -7,8 +7,8 @@ const DEMO_MOVIE_API = "/api/movies";
 
 const DATA_SOURCE_STORAGE_KEY = "cinematchDataSource";
 
-const MSG_MOVIELENS_UNAVAILABLE =
-  "The full movie library is currently unavailable. Try Sample Movies for now.";
+const MSG_FULL_LIBRARY_FALLBACK =
+  "The full library is unavailable right now. Showing quick demo recommendations instead.";
 
 const dataSourceEl = document.getElementById("data-source");
 const titleInput = document.getElementById("title-input");
@@ -21,11 +21,8 @@ const becauseLineEl = document.getElementById("because-line");
 const becauseTitleEl = document.getElementById("because-title");
 const seedTitleEl = document.getElementById("seed-title");
 const seedMetaEl = document.getElementById("seed-meta");
-const seedPosterEl = document.querySelector(".poster--seed");
-const seedCanvasEl = document.querySelector(".poster--seed .poster__canvas");
+const seedGenresEl = document.getElementById("seed-genres");
 const recListEl = document.getElementById("rec-list");
-const libraryHintEl = document.getElementById("library-hint");
-const movielensSetupNoteEl = document.getElementById("movielens-setup-note");
 const quickPicksDemoEl = document.getElementById("quick-picks-demo");
 const quickPicksMovielensEl = document.getElementById("quick-picks-movielens");
 const quickPicksLabelEl = document.getElementById("quick-picks-label");
@@ -33,6 +30,9 @@ const resultsCatalogNoteEl = document.getElementById("results-catalog-note");
 
 /** @type {boolean | null} */
 let movielensAvailability = null;
+
+/** When true, programmatic `data-source` changes skip the change handler. */
+let suppressDataSourceEvent = false;
 
 function getSelectedSource() {
   return dataSourceEl.value === "movielens" ? "movielens" : "demo";
@@ -42,46 +42,43 @@ function getApiUrl() {
   return getSelectedSource() === "movielens" ? MOVIELENS_API : DEMO_API;
 }
 
-function setPosterHue(element, title) {
-  let hue = 0;
-  const text = String(title || "film");
-  for (let i = 0; i < text.length; i += 1) {
-    hue = (hue + text.charCodeAt(i) * 17) % 360;
-  }
-  element.style.setProperty("--poster-hue", String(hue));
+function showEphemeralInfo(message) {
+  showStatus(message, "info");
+  window.setTimeout(() => {
+    if (!statusEl.hidden && statusEl.dataset.kind === "info" && statusEl.textContent === message) {
+      clearStatus();
+    }
+  }, 9000);
 }
 
-function monogramFromTitle(title) {
-  const words = String(title || "")
-    .replace(/\(\d{4}\)/g, "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  if (!words.length) {
-    return "CM";
+function applyFallbackToQuickDemo({ showNotice = false } = {}) {
+  suppressDataSourceEvent = true;
+  dataSourceEl.value = "demo";
+  suppressDataSourceEvent = false;
+  movielensAvailability = false;
+  rememberDataSourcePreference();
+  updateQuickPicks();
+  if (showNotice) {
+    showEphemeralInfo(MSG_FULL_LIBRARY_FALLBACK);
   }
-  const a = words[0].charAt(0).toUpperCase();
-  const b = (words[1] || words[0].charAt(1) || "M").charAt(0).toUpperCase();
-  return `${a}${b}`.replace(/[^A-Z0-9]/g, "") || "CM";
 }
 
-function fillPosterCanvas(canvas, title) {
-  if (!canvas) {
+function renderGenreChips(container, genreList) {
+  if (!container) {
     return;
   }
-  const layer = canvas.querySelector(".poster__art-layer");
-  if (!layer) {
+  container.innerHTML = "";
+  if (!genreList || !genreList.length) {
+    container.hidden = true;
     return;
   }
-  layer.innerHTML = "";
-  const mono = document.createElement("span");
-  mono.className = "poster__mono";
-  mono.textContent = monogramFromTitle(title);
-  const deco = document.createElement("span");
-  deco.className = "poster__deco";
-  deco.textContent = "🎬  🍿  🎫";
-  layer.appendChild(mono);
-  layer.appendChild(deco);
+  container.hidden = false;
+  for (const g of genreList) {
+    const chip = document.createElement("span");
+    chip.className = "genre-chip";
+    chip.textContent = g;
+    container.appendChild(chip);
+  }
 }
 
 function parseYearFromTitle(title) {
@@ -124,6 +121,7 @@ function hideResults() {
     resultsCatalogNoteEl.hidden = true;
     resultsCatalogNoteEl.textContent = "";
   }
+  renderGenreChips(seedGenresEl, []);
 }
 
 function formatDetail(detail) {
@@ -165,53 +163,61 @@ function truncate(text, maxLen) {
   return `${clean.slice(0, maxLen - 1)}…`;
 }
 
-function buildPosterShell(movie) {
+function buildRecCardShell() {
   const li = document.createElement("li");
-  li.className = "poster";
+  li.className = "film-card film-card--rec ticket-card";
 
-  const glow = document.createElement("div");
-  glow.className = "poster__glow";
-  glow.setAttribute("aria-hidden", "true");
+  const stripTop = document.createElement("div");
+  stripTop.className = "film-card__strip film-card__strip--top";
+  stripTop.setAttribute("aria-hidden", "true");
 
-  const frame = document.createElement("div");
-  frame.className = "poster__frame";
+  const inner = document.createElement("div");
+  inner.className = "film-card__inner";
 
-  const canvas = document.createElement("div");
-  canvas.className = "poster__canvas";
-  const artLayer = document.createElement("div");
-  artLayer.className = "poster__art-layer";
-  artLayer.setAttribute("aria-hidden", "true");
-  canvas.appendChild(artLayer);
+  const popcorn = document.createElement("span");
+  popcorn.className = "film-card__popcorn";
+  popcorn.setAttribute("aria-hidden", "true");
+  popcorn.textContent = "🍿";
 
   const body = document.createElement("div");
-  body.className = "poster__body";
+  body.className = "film-card__body";
 
-  frame.appendChild(canvas);
-  frame.appendChild(body);
-  li.appendChild(glow);
-  li.appendChild(frame);
+  inner.appendChild(popcorn);
+  inner.appendChild(body);
 
-  setPosterHue(li, movie.title);
-  fillPosterCanvas(canvas, movie.title);
+  const stripBot = document.createElement("div");
+  stripBot.className = "film-card__strip film-card__strip--bottom";
+  stripBot.setAttribute("aria-hidden", "true");
 
-  return { li, canvas, body };
+  li.appendChild(stripTop);
+  li.appendChild(inner);
+  li.appendChild(stripBot);
+
+  return { li, body };
+}
+
+function appendTagline(body) {
+  const tagline = document.createElement("p");
+  tagline.className = "film-card__tagline";
+  tagline.textContent = "Similar genres and content patterns";
+  body.appendChild(tagline);
 }
 
 function renderDemoRecommendations(items) {
   for (const movie of items) {
-    const { li, body } = buildPosterShell(movie);
+    const { li, body } = buildRecCardShell();
 
     const title = document.createElement("h3");
-    title.className = "poster__title";
+    title.className = "film-card__title";
     title.textContent = movie.title || "Untitled";
 
     const meta = document.createElement("p");
-    meta.className = "poster__meta";
+    meta.className = "film-card__meta";
     const year = movie.year != null ? String(movie.year) : "—";
-    meta.textContent = `${year} · Ref. ${movie.id ?? "—"}`;
+    meta.textContent = `Year ${year} · Ref. ${movie.id ?? "—"}`;
 
     const genres = document.createElement("div");
-    genres.className = "poster__genres";
+    genres.className = "film-card__genres";
     for (const g of movie.genres || []) {
       const chip = document.createElement("span");
       chip.className = "genre-chip";
@@ -219,21 +225,17 @@ function renderDemoRecommendations(items) {
       genres.appendChild(chip);
     }
 
-    const synopsis = document.createElement("p");
-    synopsis.className = "poster__synopsis";
-    synopsis.textContent = truncate(movie.overview, 130);
-
-    const tagline = document.createElement("p");
-    tagline.className = "poster__tagline";
-    tagline.textContent = "Similar genres and content patterns";
+    const blurb = document.createElement("p");
+    blurb.className = "film-card__blurb";
+    blurb.textContent = truncate(movie.overview, 140);
 
     body.appendChild(title);
     body.appendChild(meta);
     if (genres.childElementCount) {
       body.appendChild(genres);
     }
-    body.appendChild(synopsis);
-    body.appendChild(tagline);
+    body.appendChild(blurb);
+    appendTagline(body);
 
     recListEl.appendChild(li);
   }
@@ -241,25 +243,34 @@ function renderDemoRecommendations(items) {
 
 function renderMovielensRecommendations(items) {
   for (const movie of items) {
-    const { li, body } = buildPosterShell(movie);
+    const { li, body } = buildRecCardShell();
 
     const title = document.createElement("h3");
-    title.className = "poster__title";
+    title.className = "film-card__title";
     title.textContent = movie.title || "Untitled";
 
     const meta = document.createElement("p");
-    meta.className = "poster__meta";
+    meta.className = "film-card__meta";
     const year = movie.year != null ? String(movie.year) : "—";
-    let line = `${year} · Ref. ${movie.movie_id ?? "—"}`;
-    if (movie.mean_rating != null && movie.rating_count) {
-      line += ` · ★ ${Number(movie.mean_rating).toFixed(2)} (${Number(movie.rating_count).toLocaleString()} ratings)`;
-    } else if (movie.mean_rating != null) {
-      line += ` · ★ ${Number(movie.mean_rating).toFixed(2)}`;
+    meta.textContent = `Year ${year} · Ref. ${movie.movie_id ?? "—"}`;
+
+    const ratings = document.createElement("div");
+    ratings.className = "film-card__ratings";
+    if (movie.mean_rating != null) {
+      const badge = document.createElement("span");
+      badge.className = "rating-badge";
+      badge.textContent = `★ ${Number(movie.mean_rating).toFixed(2)}`;
+      ratings.appendChild(badge);
+      if (movie.rating_count) {
+        const count = document.createElement("span");
+        count.className = "rating-badge rating-badge--muted";
+        count.textContent = `${Number(movie.rating_count).toLocaleString()} ratings`;
+        ratings.appendChild(count);
+      }
     }
-    meta.textContent = line;
 
     const genres = document.createElement("div");
-    genres.className = "poster__genres";
+    genres.className = "film-card__genres";
     for (const g of movie.genres || []) {
       const chip = document.createElement("span");
       chip.className = "genre-chip";
@@ -267,22 +278,15 @@ function renderMovielensRecommendations(items) {
       genres.appendChild(chip);
     }
 
-    const synopsis = document.createElement("p");
-    synopsis.className = "poster__synopsis";
-    synopsis.textContent =
-      "Stylized stand-in art only—no real poster images. Rankings still use title, genres, year, and rating signals.";
-
-    const tagline = document.createElement("p");
-    tagline.className = "poster__tagline";
-    tagline.textContent = "Similar genres and content patterns";
-
     body.appendChild(title);
     body.appendChild(meta);
+    if (ratings.childElementCount) {
+      body.appendChild(ratings);
+    }
     if (genres.childElementCount) {
       body.appendChild(genres);
     }
-    body.appendChild(synopsis);
-    body.appendChild(tagline);
+    appendTagline(body);
 
     recListEl.appendChild(li);
   }
@@ -295,10 +299,10 @@ function renderRecommendations(items, source, requestedTopK) {
     li.className = "rec-empty";
     if (source === "demo") {
       li.textContent =
-        "No neighbors in this tiny reel—there are only a few films in Sample Movies. Switch to MovieLens Library for full lists, or try another title.";
+        "Nothing close turned up in this short list. Try another title or a quick pick above.";
     } else {
       li.textContent =
-        "No close matches returned for that title. Try another pick or a slightly different spelling.";
+        "No close matches for that title. Try another pick or a slightly different spelling.";
     }
     recListEl.appendChild(li);
     return;
@@ -314,17 +318,14 @@ function renderRecommendations(items, source, requestedTopK) {
     if (resultsCatalogNoteEl) {
       resultsCatalogNoteEl.hidden = false;
       resultsCatalogNoteEl.textContent =
-        `Showing all ${items.length} similar match${items.length === 1 ? "" : "es"} in this small demo. For longer lists, try the full library when it is available.`;
+        `Showing every match we found (${items.length}). This quick list is small by design.`;
     }
   }
 }
 
 function errorMessageForResponse(status, source, detail) {
   if (status === 404) {
-    return "We couldn’t find that movie. Try a quick pick above, or—for MovieLens—a specific title like Jumanji (1995).";
-  }
-  if (status === 503 && source === "movielens") {
-    return MSG_MOVIELENS_UNAVAILABLE;
+    return "We couldn’t find that movie. Try a quick pick above or include the release year in your search.";
   }
   const text = formatDetail(detail);
   if (text) {
@@ -348,7 +349,7 @@ async function probeMovielensAvailability() {
   }
 }
 
-function updateLibraryChrome() {
+function updateQuickPicks() {
   const source = getSelectedSource();
 
   if (quickPicksDemoEl && quickPicksMovielensEl) {
@@ -363,33 +364,8 @@ function updateLibraryChrome() {
 
   if (quickPicksLabelEl) {
     quickPicksLabelEl.textContent =
-      source === "movielens" ? "Quick picks (classic 1995 hits)" : "Quick picks (titles in the sample CSV)";
+      source === "movielens" ? "Try a classic night-out pick" : "Try a spotlight title";
   }
-
-  if (libraryHintEl) {
-    if (source === "movielens") {
-      libraryHintEl.innerHTML =
-        "<strong>MovieLens Library</strong> is the large catalog when the host has connected it. Cards use stylized art only—no real movie poster images.";
-    } else {
-      libraryHintEl.innerHTML =
-        "<strong>Sample Movies</strong> is a <em>tiny</em> built-in demo (six titles). Lists stay short by design. For thousands of films, choose <strong>MovieLens Library (recommended)</strong> under Fine-tune your night when the full library is available.";
-    }
-  }
-
-  if (movielensSetupNoteEl) {
-    if (source === "movielens" && movielensAvailability === false) {
-      movielensSetupNoteEl.hidden = false;
-    } else {
-      movielensSetupNoteEl.hidden = true;
-    }
-  }
-}
-
-async function refreshMovielensAvailabilityUi() {
-  if (getSelectedSource() === "movielens") {
-    await probeMovielensAvailability();
-  }
-  updateLibraryChrome();
 }
 
 async function enrichDemoSeedMeta(movieId) {
@@ -403,8 +379,8 @@ async function enrichDemoSeedMeta(movieId) {
     }
     const movie = await response.json();
     const year = movie.year != null ? String(movie.year) : "—";
-    const genres = Array.isArray(movie.genres) && movie.genres.length ? movie.genres.join(" · ") : "";
-    seedMetaEl.textContent = genres ? `${year} · ${genres} · Ref. ${movie.id}` : `${year} · Ref. ${movie.id}`;
+    seedMetaEl.textContent = `Year ${year} · Ref. ${movie.id}`;
+    renderGenreChips(seedGenresEl, movie.genres || []);
   } catch {
     /* ignore */
   }
@@ -413,7 +389,6 @@ async function enrichDemoSeedMeta(movieId) {
 async function runSearch() {
   const title = titleInput.value.trim();
   const topK = clampTopK(topkInput.value);
-  const source = getSelectedSource();
 
   hideResults();
   clearStatus();
@@ -423,24 +398,32 @@ async function runSearch() {
     return;
   }
 
-  if (source === "movielens" && movielensAvailability === false) {
-    showStatus(MSG_MOVIELENS_UNAVAILABLE, "info");
-    return;
-  }
-
   const params = new URLSearchParams({ title, top_k: String(topK) });
-  const apiUrl = getApiUrl();
+  let effectiveSource = getSelectedSource();
+  let apiUrl = getApiUrl();
 
   setLoadingState(true);
   showStatus("Finding seats that match your taste…", "loading");
 
   try {
-    const response = await fetch(`${apiUrl}?${params.toString()}`);
-    const data = await response.json().catch(() => ({}));
+    let response = await fetch(`${apiUrl}?${params.toString()}`);
+    let data = await response.json().catch(() => ({}));
+    let recoveredOnQuickDemo = false;
+
+    if (response.status === 503 && effectiveSource === "movielens") {
+      applyFallbackToQuickDemo({ showNotice: false });
+      effectiveSource = "demo";
+      apiUrl = DEMO_API;
+      response = await fetch(`${apiUrl}?${params.toString()}`);
+      data = await response.json().catch(() => ({}));
+      if (response.ok) {
+        recoveredOnQuickDemo = true;
+      }
+    }
 
     if (!response.ok) {
       showStatus(
-        errorMessageForResponse(response.status, source, data.detail),
+        errorMessageForResponse(response.status, effectiveSource, data.detail),
         "error",
         response.status,
       );
@@ -448,6 +431,9 @@ async function runSearch() {
     }
 
     clearStatus();
+    if (recoveredOnQuickDemo) {
+      showEphemeralInfo(MSG_FULL_LIBRARY_FALLBACK);
+    }
 
     if (becauseTitleEl && becauseLineEl) {
       becauseTitleEl.textContent = data.seed_title || "your pick";
@@ -456,20 +442,19 @@ async function runSearch() {
 
     seedTitleEl.textContent = data.seed_title || "Unknown title";
     const seedId = data.seed_movie_id ?? "";
-    if (source === "movielens") {
+    if (effectiveSource === "movielens") {
       const y = parseYearFromTitle(data.seed_title) || "—";
-      seedMetaEl.textContent = `${y} · Ref. ${seedId || "—"}`;
+      seedMetaEl.textContent = `Year ${y} · Ref. ${seedId || "—"}`;
     } else {
       seedMetaEl.textContent = `Ref. ${seedId || "—"}`;
       enrichDemoSeedMeta(seedId);
     }
 
-    if (seedPosterEl) {
-      setPosterHue(seedPosterEl, data.seed_title || "");
-    }
-    fillPosterCanvas(seedCanvasEl, data.seed_title || "");
-
-    renderRecommendations(Array.isArray(data.recommendations) ? data.recommendations : [], source, topK);
+    renderRecommendations(
+      Array.isArray(data.recommendations) ? data.recommendations : [],
+      effectiveSource,
+      topK,
+    );
     resultsEl.hidden = false;
   } catch {
     showStatus(
@@ -519,10 +504,27 @@ function rememberDataSourcePreference() {
   }
 }
 
-dataSourceEl.addEventListener("change", () => {
+dataSourceEl.addEventListener("change", async () => {
+  if (suppressDataSourceEvent) {
+    return;
+  }
   rememberDataSourcePreference();
-  void refreshMovielensAvailabilityUi();
+  if (dataSourceEl.value === "movielens") {
+    await probeMovielensAvailability();
+    if (movielensAvailability === false) {
+      applyFallbackToQuickDemo({ showNotice: true });
+      return;
+    }
+  }
+  updateQuickPicks();
 });
 
-restoreDataSourcePreference();
-void refreshMovielensAvailabilityUi();
+void (async () => {
+  restoreDataSourcePreference();
+  await probeMovielensAvailability();
+  if (dataSourceEl.value === "movielens" && movielensAvailability === false) {
+    applyFallbackToQuickDemo({ showNotice: true });
+  } else {
+    updateQuickPicks();
+  }
+})();
