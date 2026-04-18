@@ -46,13 +46,47 @@
           />
         </label>
 
-        <p class="quick-picks__label">Tonight’s quick picks</p>
-        <div class="quick-picks" role="group" aria-label="Suggested titles">
+        <p class="library-hint" id="library-hint">
+          <strong>Sample Movies</strong> is a tiny built-in demo (six titles)—great for a quick tour, with short lists by
+          design. For a much larger catalog, choose <strong>MovieLens Library</strong> under Fine-tune your night when the
+          person hosting this app has enabled the full library.
+        </p>
+
+        <div id="movielens-setup-note" class="catalog-banner" role="note" hidden>
+          <span class="catalog-banner__icon" aria-hidden="true">🎞️</span>
+          <span>
+            The full movie library is currently unavailable. Try Sample Movies for now.
+          </span>
+        </div>
+
+        <p class="quick-picks__label" id="quick-picks-label">Quick picks from this library</p>
+        <div
+          id="quick-picks-demo"
+          class="quick-picks"
+          role="group"
+          aria-label="Sample catalog suggestions"
+        >
+          <button type="button" class="ticket quick-pick" data-title="The Grand Budapest Hotel">
+            The Grand Budapest Hotel
+          </button>
           <button type="button" class="ticket quick-pick" data-title="Arrival">Arrival</button>
           <button type="button" class="ticket quick-pick" data-title="Paddington 2">Paddington 2</button>
           <button type="button" class="ticket quick-pick" data-title="Spirited Away">Spirited Away</button>
-          <button type="button" class="ticket quick-pick" data-title="Toy Story">Toy Story</button>
+          <button type="button" class="ticket quick-pick" data-title="Mad Max Fury Road">Mad Max Fury Road</button>
+          <button type="button" class="ticket quick-pick" data-title="Pride and Prejudice">Pride and Prejudice</button>
+        </div>
+        <div
+          id="quick-picks-movielens"
+          class="quick-picks"
+          role="group"
+          aria-label="MovieLens catalog suggestions"
+          hidden
+        >
+          <button type="button" class="ticket quick-pick" data-title="Toy Story (1995)">Toy Story (1995)</button>
           <button type="button" class="ticket quick-pick" data-title="Jumanji (1995)">Jumanji (1995)</button>
+          <button type="button" class="ticket quick-pick" data-title="Heat (1995)">Heat (1995)</button>
+          <button type="button" class="ticket quick-pick" data-title="Apollo 13 (1995)">Apollo 13 (1995)</button>
+          <button type="button" class="ticket quick-pick" data-title="Braveheart (1995)">Braveheart (1995)</button>
         </div>
 
         <details class="fine-print">
@@ -61,8 +95,8 @@
             <label class="field" for="data-source">
               <span class="field-label">Library</span>
               <select id="data-source" name="data_source">
-                <option value="demo" selected>Sample Movies</option>
-                <option value="movielens">MovieLens Library</option>
+                <option value="movielens">MovieLens Library (recommended)</option>
+                <option value="demo" selected>Sample Movies (tiny demo)</option>
               </select>
             </label>
             <label class="field" for="topk-input">
@@ -94,7 +128,9 @@
           <article class="poster poster--seed" aria-label="Your pick">
             <div class="poster__glow" aria-hidden="true"></div>
             <div class="poster__frame">
-              <div class="poster__canvas poster__canvas--seed" aria-hidden="true"></div>
+              <div class="poster__canvas poster__canvas--seed" aria-hidden="true">
+                <div class="poster__art-layer" aria-hidden="true"></div>
+              </div>
               <div class="poster__body">
                 <p class="poster__eyebrow">Your pick</p>
                 <h3 class="poster__title" id="seed-title"></h3>
@@ -105,6 +141,7 @@
         </div>
 
         <h3 class="results__heading">More films in the same spirit</h3>
+        <p id="results-catalog-note" class="results-catalog-note" hidden></p>
         <ul id="rec-list" class="rec-grid"></ul>
       </section>
     </main>

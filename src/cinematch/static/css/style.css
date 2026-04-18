@@ -225,6 +225,59 @@ body.page {
   color: rgba(154, 163, 184, 0.85);
 }
 
+.library-hint {
+  margin: 1rem 0.25rem 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: rgba(200, 208, 224, 0.95);
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 213, 128, 0.12);
+}
+
+.library-hint strong {
+  color: var(--cream);
+}
+
+.library-hint code {
+  font-size: 0.78rem;
+  padding: 0.08rem 0.28rem;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 213, 128, 0.15);
+  color: var(--gold);
+}
+
+.catalog-banner {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  margin-top: 0.85rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 170, 90, 0.4);
+  background: linear-gradient(135deg, rgba(55, 35, 18, 0.75), rgba(28, 18, 12, 0.9));
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: #ffe8cc;
+}
+
+.catalog-banner__icon {
+  flex-shrink: 0;
+  font-size: 1.25rem;
+  line-height: 1;
+  margin-top: 0.08rem;
+}
+
+.catalog-banner code {
+  font-size: 0.78rem;
+  padding: 0.06rem 0.3rem;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #ffd699;
+}
+
 .quick-picks__label {
   margin: 1.15rem 0 0.45rem 0.25rem;
   font-size: 0.72rem;
@@ -472,6 +525,20 @@ select:focus {
   color: var(--gold-dim);
 }
 
+.results-catalog-note {
+  margin: -0.35rem auto 1rem;
+  max-width: 36rem;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: rgba(200, 208, 224, 0.95);
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px dashed rgba(255, 213, 128, 0.22);
+  background: rgba(0, 0, 0, 0.22);
+}
+
 .rec-grid {
   list-style: none;
   margin: 0;
@@ -514,42 +581,84 @@ select:focus {
 .poster__frame {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
   border-radius: 14px;
   overflow: hidden;
   border: 2px solid rgba(255, 213, 128, 0.35);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04);
   background: var(--card);
 }
 
 .poster__canvas {
-  aspect-ratio: 2 / 3;
-  max-height: 200px;
-  background: linear-gradient(
-    145deg,
-    hsl(var(--poster-hue, 210), 42%, 22%) 0%,
-    hsl(calc(var(--poster-hue, 210) + 40), 38%, 14%) 100%
-  );
   position: relative;
+  flex: 0 0 auto;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  min-height: 220px;
+  max-height: 320px;
+  background:
+    radial-gradient(ellipse 90% 70% at 50% 88%, rgba(0, 0, 0, 0.55), transparent 55%),
+    linear-gradient(
+      155deg,
+      hsl(var(--poster-hue, 210), 48%, 28%) 0%,
+      hsl(calc(var(--poster-hue, 210) + 52), 42%, 12%) 48%,
+      hsl(calc(var(--poster-hue, 210) + 18), 36%, 8%) 100%
+    );
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.45);
 }
 
 .poster--seed .poster__canvas {
-  max-height: 240px;
+  max-height: 280px;
 }
 
-.poster__canvas::after {
-  content: "✦ No poster — original art ✦";
+.poster__canvas::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.22;
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0,
+    transparent 5px,
+    rgba(0, 0, 0, 0.35) 5px,
+    rgba(0, 0, 0, 0.35) 7px
+  );
+  mix-blend-mode: multiply;
+}
+
+.poster__art-layer {
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  text-align: center;
-  padding: 1rem;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.35);
+  gap: 0.35rem;
+  padding: 1rem 1.25rem 1.5rem;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.poster__mono {
+  font-size: clamp(2.75rem, 12vw, 3.75rem);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.2);
+  text-shadow:
+    0 0 48px rgba(255, 255, 255, 0.12),
+    0 4px 24px rgba(0, 0, 0, 0.5);
+}
+
+.poster__deco {
+  font-size: clamp(0.95rem, 3.5vw, 1.15rem);
+  letter-spacing: 0.4em;
+  opacity: 0.88;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
 }
 
 .poster__body {

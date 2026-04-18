@@ -25,7 +25,7 @@
 | | |
 |--|--|
 | **Goal** | Demonstrate an end-to-end ML-adjacent service: validated data ingestion, text vectorization, ranking, and a documented HTTP API. |
-| **What ships today** | Two **content-based** paths: a **demo CSV** (bundled sample) and an optional **MovieLens** export (`movies.csv` + `ratings.csv`). |
+| **What ships today** | Two **content-based** paths: a **tiny demo CSV** (about half a dozen titles bundled for screenshots) and an optional **MovieLens** export (`movies.csv` + `ratings.csv`) for realistic testing. |
 | **What is out of scope (for now)** | User accounts, training pipelines, collaborative filtering, and production deployment hardening. |
 
 **Stack:** Python 3.11+, FastAPI, Pydantic v2, Uvicorn, scikit-learn, pytest.
@@ -165,7 +165,7 @@ Exact `recommendations` depend on your MovieLens slice and TF–IDF scores.
 
 ## Setup and run
 
-**Prerequisites:** Python **3.11+**, `pip`, and optionally a MovieLens **ml-latest-small** (or compatible) unzip for the `/api/movielens` route.
+**Prerequisites:** Python **3.11+**, `pip`, and optionally a MovieLens **ml-latest-small** (or compatible) unzip if you want the **MovieLens Library** path in the UI and `/api/movielens/...` (recommended for anything beyond the tiny bundled sample).
 
 ```bash
 cd cinematch-ai
@@ -182,25 +182,35 @@ uvicorn cinematch.main:app --reload --app-dir src
 
 ## Web UI
 
-The home page (`/`) is a **vanilla HTML/CSS/JS** client (no build step) with a **theater-style** layout: spotlight hero, popcorn motif, film-strip accents, ticket “quick pick” chips, a large search bar, and **poster-style** result cards. Catalog choice (**Sample Movies** vs **MovieLens Library**) and how many picks to show live under **Fine-tune your night**. The same JSON APIs power the experience:
+The home page (`/`) is a **vanilla HTML/CSS/JS** client (no build step) with a **theater-style** layout: spotlight hero, popcorn motif, film-strip accents, ticket “quick pick” chips, a large search bar, and **poster-style** cards. Each card uses **CSS gradients and a monogram placeholder** (no copyrighted poster art). Catalog choice and how many picks to show live under **Fine-tune your night**. The same JSON APIs power the experience:
 
 | Mode | API used | What you see |
 |------|------------|----------------|
-| **Demo catalog** | `GET /api/recommendations/by-title` | Seed + list with **overview** snippets (`data/sample_movies.csv` or `CINEMATCH_DATA_CSV`). |
-| **MovieLens** | `GET /api/movielens/recommendations/by-title` | Seed + list with **genres, year, ids**, and optional **mean rating / count** (MovieLens has no plot field in the CSV). |
+| **Sample Movies** | `GET /api/recommendations/by-title` | A **small fixed demo** (`data/sample_movies.csv` or `CINEMATCH_DATA_CSV`). Recommendation lists are **short by design**—the UI explains that so the experience still feels intentional. |
+| **MovieLens Library** | `GET /api/movielens/recommendations/by-title` | **Recommended for “real app” testing**: thousands of titles, **genres, year, ids**, and optional **mean rating / count** (MovieLens has no plot field in the CSV). |
 
-Empty search shows an inline message. **404** / **400** show the API `detail`; if **Demo** returns **404** for a title that only exists in MovieLens (for example **Jumanji**), the UI adds a tip to switch **Data source** to **MovieLens** when the server has **`CINEMATCH_MOVIELENS_DIR`** set. If MovieLens is selected but data is missing, **503** responses show a friendly setup message plus the server `detail`. Your last source choice is remembered for the browser tab (**sessionStorage**).
+**Choosing a catalog**
 
-**MovieLens (ml-latest-small) for `/api/movielens/...`**
+- **Sample Movies** — Ships with the repo; only **six titles**. Quick picks match those rows exactly. Use it for a fast demo without downloading data.  
+- **MovieLens Library (recommended)** — Point **`CINEMATCH_MOVIELENS_DIR`** at an extracted **ml-latest-small** folder (see below). Quick picks use well-known **1995** titles from that dataset. If the variable is not set, the UI shows a **short, non-technical notice** and blocks searches in MovieLens mode until you configure the server or switch back to Sample Movies (setup steps stay in this README only).
 
-1. **Download** the official dataset from GroupLens: open **[MovieLens Latest Datasets](https://grouplens.org/datasets/movielens/latest/)** and download **ml-latest-small** (direct link to the zip is also listed there as `ml-latest-small.zip`).  
-2. **Unzip** the archive. You should get a folder named **`ml-latest-small`** whose **immediate children** include `movies.csv` and `ratings.csv` (same directory level—not buried under an extra nested folder).  
-3. **Point the app** at that folder. Prefer an **absolute path** so it still works after you `cd`:
+Empty search shows an inline message. **404** and **503** use friendly copy in the marquee (including guidance to try Sample Movies when MovieLens is unavailable). Your last source choice is remembered for the browser tab (**sessionStorage**).
+
+### Downloading MovieLens **ml-latest-small** (recommended)
+
+These steps use the official **GroupLens** release (free, no API key). Nothing large is committed to GitHub—you download it locally.
+
+1. Open **[MovieLens Latest Datasets](https://grouplens.org/datasets/movielens/latest/)** in your browser.  
+2. Download **`ml-latest-small.zip`** (about 1 MB; “small” means smaller than the full MovieLens dumps, not “small feature set”).  
+3. **Unzip** the archive. You should see a folder named **`ml-latest-small`**. Inside it, **`movies.csv`** and **`ratings.csv`** must sit **in the same directory** (not only inside nested archives).  
+4. **Set the environment variable** to the **absolute path** of that folder (adjust the path for your machine):
 
 ```bash
 export CINEMATCH_MOVIELENS_DIR="/absolute/path/to/ml-latest-small"
 uvicorn cinematch.main:app --reload --app-dir src
 ```
+
+5. In the web UI, open **Fine-tune your night** → choose **MovieLens Library (recommended)** → use quick picks or search (e.g. **Toy Story (1995)**).
 
 If the path is wrong or the CSVs are missing, `/api/movielens/recommendations/by-title` responds with **`503`** and a JSON `detail` string explaining that `movies.csv` / `ratings.csv` were not found or could not be parsed.
 
@@ -252,7 +262,7 @@ You can paste the same **example JSON** blocks above into the repo as **`.json` 
 ## Roadmap
 
 - Collaborative or hybrid models using `PreparedMovieLensDataset.ratings`.  
-- Posters / metadata via TMDB (with caching and API key config).  
+- Integrate TMDB API for real movie posters and metadata.  
 - Docker and CI (GitHub Actions) for install + `pytest` on push.
 
 ---

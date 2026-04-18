@@ -68,3 +68,5 @@ data/movielens/
 .cursor/
 .cursorignore
 .cursorindexingignore
+data/movies.csv
+data/ratings.csv

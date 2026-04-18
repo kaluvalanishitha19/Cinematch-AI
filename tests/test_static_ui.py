@@ -22,6 +22,12 @@ def test_home_page_serves_ui_shell() -> None:
     assert 'value="movielens"' in body
     assert "/static/js/recommendations.js" in body
     assert "Get Recommendations" in body
+    assert 'id="library-hint"' in body
+    assert 'id="movielens-setup-note"' in body
+    assert 'id="results-catalog-note"' in body
+    assert "The Grand Budapest Hotel" in body
+    assert "MovieLens Library (recommended)" in body
+    assert "Toy Story (1995)" in body
     assert "Jumanji (1995)" in body
 
 
@@ -34,3 +40,4 @@ def test_static_js_wires_demo_and_movielens_apis() -> None:
     assert "getApiUrl" in text
     assert "setLoadingState" in text
     assert "sessionStorage" in text
+    assert "___cinematch_probe___" in text
