@@ -37,7 +37,7 @@
 - **`cinematch.data`** — Load and clean data (`loader`, `pipeline`, `preprocess`), plus a **`movielens`** subpackage for MovieLens CSV layout, merges, and optional LRU **cache**.  
 - **`cinematch.recommend`** — Pure recommendation helpers: demo **`content`** (overview + genres) and **`movielens_content`** (title + genres + year + rating summaries).  
 - **`cinematch.api`** — HTTP routers under `/api` (demo catalog) and `/api/movielens` (MovieLens-backed route).  
-- **`cinematch.static`** — Single-page UI at `/` (search + results) calling the demo recommendations API.
+- **`cinematch.static`** — Portfolio-style landing UI at `/` (hero, search card, results) calling demo or MovieLens APIs from the browser.
 
 ---
 
@@ -182,7 +182,7 @@ uvicorn cinematch.main:app --reload --app-dir src
 
 ## Web UI
 
-The home page (`/`) is a small **vanilla HTML/CSS/JS** client (no build step). A **Data source** control lets users pick:
+The home page (`/`) is a **vanilla HTML/CSS/JS** client (no build step) with a centered **hero**, a **search card** (data source, title, top‑K, search), **loading** and **HTTP-aware error** states, and a responsive **results grid**. A **Data source** control lets users pick:
 
 | Mode | API used | What you see |
 |------|------------|----------------|
@@ -240,7 +240,9 @@ Add these under **`docs/images/`** (create the folder when you have assets) and 
 1. **Swagger UI** — `http://127.0.0.1:8000/docs` showing the `/api/recommendations/by-title` and `/api/movielens/recommendations/by-title` operations expanded.  
 2. **Terminal sample** — A short session: `curl` call + pretty-printed JSON (or `httpie` / `jq`), demonstrating a 200 response and one error case (`404` or `503`).  
 3. **Architecture** (optional) — A simple diagram: CSV → preprocess → TF–IDF → FastAPI → client.  
-4. **Web UI** — Screenshot of `/` with search, seed movie, and recommendation list.
+4. **Web UI (desktop)** — Full-width screenshot of `/`: hero, search card, loading or success state, highlighted seed strip, and two-column recommendation cards.  
+5. **Web UI (mobile)** — Narrow viewport showing stacked layout and the same search card.  
+6. **Error states** — Optional captures of the alert for **404** (demo vs MovieLens) and **503** (MovieLens not configured) to show polish.
 
 You can paste the same **example JSON** blocks above into the repo as **`.json` examples** under `docs/examples/` if you want copy-paste fixtures without maintaining screenshots.
 

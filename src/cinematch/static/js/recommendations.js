@@ -10,6 +10,7 @@ const dataSourceEl = document.getElementById("data-source");
 const titleInput = document.getElementById("title-input");
 const topkInput = document.getElementById("topk-input");
 const searchBtn = document.getElementById("search-btn");
+const searchCardEl = document.getElementById("search-card");
 const statusEl = document.getElementById("status");
 const resultsEl = document.getElementById("results");
 const seedTitleEl = document.getElementById("seed-title");
@@ -24,16 +25,29 @@ function getApiUrl() {
   return getSelectedSource() === "movielens" ? MOVIELENS_API : DEMO_API;
 }
 
-function showStatus(message, kind) {
+function setLoadingState(isLoading) {
+  searchBtn.disabled = isLoading;
+  if (searchCardEl) {
+    searchCardEl.setAttribute("aria-busy", isLoading ? "true" : "false");
+  }
+}
+
+function showStatus(message, kind, httpStatus) {
   statusEl.textContent = message;
   statusEl.hidden = false;
   statusEl.dataset.kind = kind;
+  if (httpStatus != null) {
+    statusEl.dataset.httpStatus = String(httpStatus);
+  } else {
+    delete statusEl.dataset.httpStatus;
+  }
 }
 
 function clearStatus() {
   statusEl.textContent = "";
   statusEl.hidden = true;
   statusEl.removeAttribute("data-kind");
+  delete statusEl.dataset.httpStatus;
 }
 
 function hideResults() {
@@ -180,12 +194,28 @@ function renderRecommendations(items, source) {
 function friendlyError(status, source, detailText) {
   if (status === 503 && source === "movielens") {
     return [
-      "MovieLens is not available on this server yet.",
-      "Set environment variable CINEMATCH_MOVIELENS_DIR to the extracted ml-latest-small folder (with movies.csv and ratings.csv), then restart Uvicorn—or pick “Demo catalog” above.",
-      `Server said: ${detailText}`,
-    ].join(" ");
+      "MovieLens is not configured on this server (or the CSV path is wrong).",
+      "Set CINEMATCH_MOVIELENS_DIR to the extracted ml-latest-small folder containing movies.csv and ratings.csv, restart Uvicorn, or switch to Demo catalog.",
+      "",
+      `Details: ${detailText}`,
+    ].join("\n");
+  }
+  if (status === 503) {
+    return ["Service unavailable.", "", detailText].join("\n");
   }
   return detailText;
+}
+
+function buildErrorMessage(status, source, detailText) {
+  const base = friendlyError(status, source, detailText);
+  if (status === 404) {
+    return [
+      "No exact title match in the selected source.",
+      "",
+      base,
+    ].join("\n");
+  }
+  return base;
 }
 
 async function runSearch() {
@@ -197,14 +227,15 @@ async function runSearch() {
   clearStatus();
 
   if (!title) {
-    showStatus("Please enter a movie title to search.", "info");
+    showStatus("Enter a movie title to run a similarity search.", "info");
     return;
   }
 
-  showStatus("Looking for similar movies…", "info");
-
   const params = new URLSearchParams({ title, top_k: String(topK) });
   const apiUrl = getApiUrl();
+
+  setLoadingState(true);
+  showStatus("Ranking neighbors with TF–IDF…", "loading");
 
   try {
     const response = await fetch(`${apiUrl}?${params.toString()}`);
@@ -212,15 +243,14 @@ async function runSearch() {
 
     if (!response.ok) {
       const detailText = formatDetail(data.detail);
-      let message = friendlyError(response.status, source, detailText);
+      let message = buildErrorMessage(response.status, source, detailText);
       if (response.status === 404 && source === "demo") {
         message += [
           "",
-          "The demo catalog is a tiny sample. For titles like Jumanji, switch Data source to MovieLens",
-          "(your server needs CINEMATCH_MOVIELENS_DIR pointing at movies.csv + ratings.csv).",
-        ].join(" ");
+          "Tip: the demo list is only six rows. For broader catalogs, choose MovieLens (requires CINEMATCH_MOVIELENS_DIR).",
+        ].join("\n");
       }
-      showStatus(message, "error");
+      showStatus(message, "error", response.status);
       return;
     }
 
@@ -232,9 +262,18 @@ async function runSearch() {
     resultsEl.hidden = false;
   } catch {
     showStatus(
-      "Could not reach the server. Start the app with Uvicorn and open this page from http://127.0.0.1:8000 .",
+      [
+        "Could not reach the API.",
+        "",
+        "Start Uvicorn from the project root:",
+        "uvicorn cinematch.main:app --reload --app-dir src",
+        "",
+        "Then open http://127.0.0.1:8000/",
+      ].join("\n"),
       "error",
     );
+  } finally {
+    setLoadingState(false);
   }
 }
 
@@ -254,7 +293,7 @@ function restoreDataSourcePreference() {
       dataSourceEl.value = saved;
     }
   } catch {
-    /* private mode or blocked storage — ignore */
+    /* ignore */
   }
 }
 

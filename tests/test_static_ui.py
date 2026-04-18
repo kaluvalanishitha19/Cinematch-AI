@@ -13,10 +13,12 @@ def test_home_page_serves_ui_shell() -> None:
     body = response.text
     assert 'id="title-input"' in body
     assert 'id="data-source"' in body
+    assert 'id="search-card"' in body
+    assert 'id="hero-title"' in body
     assert 'value="demo"' in body
     assert 'value="movielens"' in body
     assert "/static/js/recommendations.js" in body
-    assert "Recommend" in body
+    assert "Search" in body
     assert "Jumanji" in body
 
 
@@ -29,3 +31,4 @@ def test_static_js_wires_demo_and_movielens_apis() -> None:
     assert "CINEMATCH_MOVIELENS_DIR" in text
     assert "getApiUrl" in text
     assert "sessionStorage" in text
+    assert "setLoadingState" in text
