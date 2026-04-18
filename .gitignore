@@ -70,3 +70,4 @@ data/movielens/
 .cursorindexingignore
 data/movies.csv
 data/ratings.csv
+.cursor/
