@@ -1,4 +1,4 @@
-"""Load movie CSVs from disk and return preprocessed `Movie` records."""
+"""Read movie CSV files from disk (path resolution + CSV parsing only)."""
 
 from __future__ import annotations
 
@@ -6,14 +6,12 @@ import csv
 import os
 from pathlib import Path
 
-from cinematch.data.preprocess import dedupe_by_id, preprocess_movie_row, sort_by_id
+from cinematch.data.pipeline import REQUIRED_COLUMNS, raw_rows_to_movies
 from cinematch.data.schema import Movie
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _DEFAULT_CSV = _REPO_ROOT / "data" / "sample_movies.csv"
 _ENV_CSV = "CINEMATCH_DATA_CSV"
-
-_REQUIRED_COLUMNS = ("id", "title", "year", "genres", "overview")
 
 
 def _resolve_csv_path(csv_path: Path | None) -> Path:
@@ -28,7 +26,7 @@ def _resolve_csv_path(csv_path: Path | None) -> Path:
 def _validate_header(fieldnames: list[str] | None) -> None:
     if not fieldnames:
         raise ValueError("CSV is missing a header row.")
-    missing = [name for name in _REQUIRED_COLUMNS if name not in fieldnames]
+    missing = [name for name in REQUIRED_COLUMNS if name not in fieldnames]
     if missing:
         raise ValueError(f"CSV is missing required columns: {', '.join(missing)}")
 
@@ -54,25 +52,15 @@ def _read_csv_rows(path: Path) -> list[dict[str, str]]:
 
 
 def load_movies(csv_path: Path | None = None) -> list[Movie]:
-    """Load, validate, preprocess, dedupe, and sort movies from a CSV file.
+    """Load movies from CSV: parse file, then run the preprocessing pipeline.
 
-    Uses ``data/sample_movies.csv`` under the repository root by default.
-    Set ``CINEMATCH_DATA_CSV`` to an absolute or relative path to override.
-    Returns an empty list if the file does not exist (useful for optional mounts).
+    Default file: ``data/sample_movies.csv`` at the repo root. Override with the
+    ``CINEMATCH_DATA_CSV`` environment variable. Returns ``[]`` if the file path
+    does not exist.
     """
     path = _resolve_csv_path(csv_path)
     if not path.is_file():
         return []
 
     raw_rows = _read_csv_rows(path)
-    movies: list[Movie] = []
-    # +2 accounts for 1-based headers and 0-based enumerate starting at the first data row.
-    for index, row in enumerate(raw_rows):
-        line_no = index + 2
-        missing_cols = [name for name in _REQUIRED_COLUMNS if name not in row]
-        if missing_cols:
-            raise ValueError(f"line {line_no}: missing keys {missing_cols}")
-        movies.append(preprocess_movie_row(row, line_no=line_no))
-
-    movies = dedupe_by_id(movies)
-    return sort_by_id(movies)
+    return raw_rows_to_movies(raw_rows)

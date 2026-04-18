@@ -1,1 +1,1 @@
-"""Recommendation strategies (to be implemented in later milestones)."""
+"""Recommendation helpers (demo CSV content model + MovieLens content model)."""
