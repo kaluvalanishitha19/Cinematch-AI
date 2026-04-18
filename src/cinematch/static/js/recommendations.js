@@ -1,5 +1,5 @@
 /**
- * Front-end for title-based recommendations: demo catalog or MovieLens.
+ * CineMatch front-end — demo or MovieLens title search (same APIs as before).
  */
 const DEMO_API = "/api/recommendations/by-title";
 const MOVIELENS_API = "/api/movielens/recommendations/by-title";
@@ -13,8 +13,11 @@ const searchBtn = document.getElementById("search-btn");
 const searchCardEl = document.getElementById("search-card");
 const statusEl = document.getElementById("status");
 const resultsEl = document.getElementById("results");
+const becauseLineEl = document.getElementById("because-line");
+const becauseTitleEl = document.getElementById("because-title");
 const seedTitleEl = document.getElementById("seed-title");
 const seedMetaEl = document.getElementById("seed-meta");
+const seedPosterEl = document.querySelector(".poster--seed");
 const recListEl = document.getElementById("rec-list");
 
 function getSelectedSource() {
@@ -23,6 +26,15 @@ function getSelectedSource() {
 
 function getApiUrl() {
   return getSelectedSource() === "movielens" ? MOVIELENS_API : DEMO_API;
+}
+
+function setPosterHue(element, title) {
+  let hue = 0;
+  const text = String(title || "film");
+  for (let i = 0; i < text.length; i += 1) {
+    hue = (hue + text.charCodeAt(i) * 17) % 360;
+  }
+  element.style.setProperty("--poster-hue", String(hue));
 }
 
 function setLoadingState(isLoading) {
@@ -53,11 +65,14 @@ function clearStatus() {
 function hideResults() {
   resultsEl.hidden = true;
   recListEl.innerHTML = "";
+  if (becauseLineEl) {
+    becauseLineEl.hidden = true;
+  }
 }
 
 function formatDetail(detail) {
   if (!detail) {
-    return "Something went wrong.";
+    return "";
   }
   if (typeof detail === "string") {
     return detail;
@@ -94,22 +109,47 @@ function truncate(text, maxLen) {
   return `${clean.slice(0, maxLen - 1)}…`;
 }
 
+function buildPosterShell() {
+  const li = document.createElement("li");
+  li.className = "poster";
+
+  const glow = document.createElement("div");
+  glow.className = "poster__glow";
+  glow.setAttribute("aria-hidden", "true");
+
+  const frame = document.createElement("div");
+  frame.className = "poster__frame";
+
+  const canvas = document.createElement("div");
+  canvas.className = "poster__canvas";
+
+  const body = document.createElement("div");
+  body.className = "poster__body";
+
+  frame.appendChild(canvas);
+  frame.appendChild(body);
+  li.appendChild(glow);
+  li.appendChild(frame);
+
+  return { li, canvas, body };
+}
+
 function renderDemoRecommendations(items) {
   for (const movie of items) {
-    const li = document.createElement("li");
-    li.className = "rec-card";
+    const { li, canvas, body } = buildPosterShell();
+    setPosterHue(li, movie.title);
 
-    const title = document.createElement("p");
-    title.className = "rec-card__title";
+    const title = document.createElement("h3");
+    title.className = "poster__title";
     title.textContent = movie.title || "Untitled";
 
     const meta = document.createElement("p");
-    meta.className = "rec-card__meta";
-    const year = movie.year != null ? String(movie.year) : "Year n/a";
-    meta.textContent = `${year} · id ${movie.id ?? "—"}`;
+    meta.className = "poster__meta";
+    const year = movie.year != null ? String(movie.year) : "—";
+    meta.textContent = `${year} · Ref. ${movie.id ?? "—"}`;
 
     const genres = document.createElement("div");
-    genres.className = "rec-card__genres";
+    genres.className = "poster__genres";
     for (const g of movie.genres || []) {
       const chip = document.createElement("span");
       chip.className = "genre-chip";
@@ -117,41 +157,46 @@ function renderDemoRecommendations(items) {
       genres.appendChild(chip);
     }
 
-    const overview = document.createElement("p");
-    overview.className = "rec-card__overview";
-    overview.textContent = truncate(movie.overview, 220);
+    const synopsis = document.createElement("p");
+    synopsis.className = "poster__synopsis";
+    synopsis.textContent = truncate(movie.overview, 140);
 
-    li.appendChild(title);
-    li.appendChild(meta);
+    const tagline = document.createElement("p");
+    tagline.className = "poster__tagline";
+    tagline.textContent = "Similar genres and content patterns";
+
+    body.appendChild(title);
+    body.appendChild(meta);
     if (genres.childElementCount) {
-      li.appendChild(genres);
+      body.appendChild(genres);
     }
-    li.appendChild(overview);
+    body.appendChild(synopsis);
+    body.appendChild(tagline);
+
     recListEl.appendChild(li);
   }
 }
 
 function renderMovielensRecommendations(items) {
   for (const movie of items) {
-    const li = document.createElement("li");
-    li.className = "rec-card";
+    const { li, canvas, body } = buildPosterShell();
+    setPosterHue(li, movie.title);
 
-    const title = document.createElement("p");
-    title.className = "rec-card__title";
+    const title = document.createElement("h3");
+    title.className = "poster__title";
     title.textContent = movie.title || "Untitled";
 
     const meta = document.createElement("p");
-    meta.className = "rec-card__meta";
-    const year = movie.year != null ? String(movie.year) : "Year n/a";
-    const mid = movie.movie_id ?? "—";
-    let line = `${year} · movie id ${mid}`;
+    meta.className = "poster__meta";
+    const year = movie.year != null ? String(movie.year) : "—";
+    let line = `${year} · Ref. ${movie.movie_id ?? "—"}`;
     if (movie.mean_rating != null && movie.rating_count) {
-      line += ` · avg ${Number(movie.mean_rating).toFixed(2)} (${movie.rating_count} ratings)`;
+      line += ` · ★ ${Number(movie.mean_rating).toFixed(2)} (${movie.rating_count} ratings)`;
     }
     meta.textContent = line;
 
     const genres = document.createElement("div");
-    genres.className = "rec-card__genres";
+    genres.className = "poster__genres";
     for (const g of movie.genres || []) {
       const chip = document.createElement("span");
       chip.className = "genre-chip";
@@ -159,17 +204,23 @@ function renderMovielensRecommendations(items) {
       genres.appendChild(chip);
     }
 
-    const note = document.createElement("p");
-    note.className = "rec-card__overview rec-card__overview--muted";
-    note.textContent =
-      "MovieLens row (no plot text in this dataset). Similarity uses title, genres, year, and rating summary tokens.";
+    const synopsis = document.createElement("p");
+    synopsis.className = "poster__synopsis";
+    synopsis.textContent =
+      "Placeholder art only — this library does not ship poster images. Rankings still use story signals from the catalog.";
 
-    li.appendChild(title);
-    li.appendChild(meta);
+    const tagline = document.createElement("p");
+    tagline.className = "poster__tagline";
+    tagline.textContent = "Similar genres and content patterns";
+
+    body.appendChild(title);
+    body.appendChild(meta);
     if (genres.childElementCount) {
-      li.appendChild(genres);
+      body.appendChild(genres);
     }
-    li.appendChild(note);
+    body.appendChild(synopsis);
+    body.appendChild(tagline);
+
     recListEl.appendChild(li);
   }
 }
@@ -179,7 +230,7 @@ function renderRecommendations(items, source) {
   if (!items.length) {
     const li = document.createElement("li");
     li.className = "rec-empty";
-    li.textContent = "No other movies in the catalog to suggest yet.";
+    li.textContent = "The house lights are on, but we need more rows in this reel to fill extra seats.";
     recListEl.appendChild(li);
     return;
   }
@@ -191,31 +242,18 @@ function renderRecommendations(items, source) {
   }
 }
 
-function friendlyError(status, source, detailText) {
-  if (status === 503 && source === "movielens") {
-    return [
-      "MovieLens is not configured on this server (or the CSV path is wrong).",
-      "Set CINEMATCH_MOVIELENS_DIR to the extracted ml-latest-small folder containing movies.csv and ratings.csv, restart Uvicorn, or switch to Demo catalog.",
-      "",
-      `Details: ${detailText}`,
-    ].join("\n");
-  }
-  if (status === 503) {
-    return ["Service unavailable.", "", detailText].join("\n");
-  }
-  return detailText;
-}
-
-function buildErrorMessage(status, source, detailText) {
-  const base = friendlyError(status, source, detailText);
+function errorMessageForResponse(status, source, detail) {
   if (status === 404) {
-    return [
-      "No exact title match in the selected source.",
-      "",
-      base,
-    ].join("\n");
+    return "We couldn’t find that movie. Try a more specific title like Jumanji (1995).";
   }
-  return base;
+  if (status === 503 && source === "movielens") {
+    return "The full movie library is not available right now. Try Sample Movies.";
+  }
+  const text = formatDetail(detail);
+  if (text) {
+    return `Something went wrong.\n\n${text}`;
+  }
+  return "Something went wrong. Please try again in a moment.";
 }
 
 async function runSearch() {
@@ -227,7 +265,7 @@ async function runSearch() {
   clearStatus();
 
   if (!title) {
-    showStatus("Enter a movie title to run a similarity search.", "info");
+    showStatus("Pop in a movie title above to get started.", "info");
     return;
   }
 
@@ -235,41 +273,40 @@ async function runSearch() {
   const apiUrl = getApiUrl();
 
   setLoadingState(true);
-  showStatus("Ranking neighbors with TF–IDF…", "loading");
+  showStatus("Finding seats that match your taste…", "loading");
 
   try {
     const response = await fetch(`${apiUrl}?${params.toString()}`);
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      const detailText = formatDetail(data.detail);
-      let message = buildErrorMessage(response.status, source, detailText);
-      if (response.status === 404 && source === "demo") {
-        message += [
-          "",
-          "Tip: the demo list is only six rows. For broader catalogs, choose MovieLens (requires CINEMATCH_MOVIELENS_DIR).",
-        ].join("\n");
-      }
-      showStatus(message, "error", response.status);
+      showStatus(
+        errorMessageForResponse(response.status, source, data.detail),
+        "error",
+        response.status,
+      );
       return;
     }
 
     clearStatus();
+
+    if (becauseTitleEl && becauseLineEl) {
+      becauseTitleEl.textContent = data.seed_title || "your pick";
+      becauseLineEl.hidden = false;
+    }
+
     seedTitleEl.textContent = data.seed_title || "Unknown title";
-    seedMetaEl.textContent = `Catalog id: ${data.seed_movie_id ?? "—"}`;
+    seedMetaEl.textContent = `Ref. ${data.seed_movie_id ?? "—"}`;
+
+    if (seedPosterEl) {
+      setPosterHue(seedPosterEl, data.seed_title || "");
+    }
 
     renderRecommendations(Array.isArray(data.recommendations) ? data.recommendations : [], source);
     resultsEl.hidden = false;
   } catch {
     showStatus(
-      [
-        "Could not reach the API.",
-        "",
-        "Start Uvicorn from the project root:",
-        "uvicorn cinematch.main:app --reload --app-dir src",
-        "",
-        "Then open http://127.0.0.1:8000/",
-      ].join("\n"),
+      "We lost the signal for a moment. Refresh the page, or open this site from your running CineMatch server.",
       "error",
     );
   } finally {
@@ -284,6 +321,16 @@ titleInput.addEventListener("keydown", (event) => {
     event.preventDefault();
     runSearch();
   }
+});
+
+document.querySelectorAll(".quick-pick").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const t = btn.getAttribute("data-title");
+    if (t) {
+      titleInput.value = t;
+      titleInput.focus();
+    }
+  });
 });
 
 function restoreDataSourcePreference() {

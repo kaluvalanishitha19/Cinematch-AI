@@ -3,132 +3,117 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CineMatch AI</title>
+    <title>CineMatch AI — Your next favorite film</title>
     <link rel="stylesheet" href="/static/css/style.css" />
   </head>
   <body class="page">
     <div class="page__bg" aria-hidden="true"></div>
+    <div class="filmstrip filmstrip--top" aria-hidden="true"></div>
 
     <header class="topbar">
-      <span class="topbar__brand">CineMatch AI</span>
-      <a class="topbar__link" href="/docs">API reference</a>
+      <span class="topbar__brand" aria-hidden="true">🎬</span>
+      <span class="topbar__title">CineMatch AI</span>
     </header>
 
     <main class="layout">
       <section class="hero" aria-labelledby="hero-title">
-        <p class="hero__eyebrow">Portfolio · FastAPI · scikit-learn</p>
-        <h1 id="hero-title" class="hero__title">Film recommendations, explained</h1>
-        <p class="hero__lead">
-          CineMatch scores similarity with <strong>TF–IDF</strong> over catalog text—ideal for demos,
-          interviews, and iterating toward richer models. Switch between a compact <strong>demo</strong> CSV
-          and a local <strong>MovieLens</strong> extract without changing code.
+        <div class="hero__spotlight" aria-hidden="true"></div>
+        <div class="hero__popcorn" aria-hidden="true" title="Popcorn">🍿</div>
+        <h1 id="hero-title" class="hero__title">Find Your Next Favorite Movie</h1>
+        <p class="hero__subtitle">
+          Search for a movie you like and CineMatch AI will recommend similar films based on genre and content
+          similarity.
         </p>
-        <ul class="hero__tags" aria-label="Highlights">
-          <li class="hero__tag">Content-based</li>
-          <li class="hero__tag">Pydantic + OpenAPI</li>
-          <li class="hero__tag">Production-shaped layout</li>
-        </ul>
       </section>
 
       <section
         id="search-card"
-        class="search-card"
+        class="search-card marquee"
         aria-labelledby="search-heading"
-        aria-describedby="data-source-hint"
       >
-        <div class="search-card__head">
-          <h2 id="search-heading" class="search-card__title">Run a query</h2>
-          <p class="search-card__sub">
-            Choose a data source, enter a title, and set how many neighbors to return.
-          </p>
+        <div class="search-card__filmstrip" aria-hidden="true"></div>
+        <h2 id="search-heading" class="visually-hidden">Movie search</h2>
+
+        <label class="search-bar" for="title-input">
+          <span class="search-bar__icon" aria-hidden="true">🔎</span>
+          <input
+            id="title-input"
+            type="search"
+            name="title"
+            autocomplete="off"
+            placeholder="What did you love watching last?"
+            class="search-bar__input"
+          />
+        </label>
+
+        <p class="quick-picks__label">Tonight’s quick picks</p>
+        <div class="quick-picks" role="group" aria-label="Suggested titles">
+          <button type="button" class="ticket quick-pick" data-title="Arrival">Arrival</button>
+          <button type="button" class="ticket quick-pick" data-title="Paddington 2">Paddington 2</button>
+          <button type="button" class="ticket quick-pick" data-title="Spirited Away">Spirited Away</button>
+          <button type="button" class="ticket quick-pick" data-title="Toy Story">Toy Story</button>
+          <button type="button" class="ticket quick-pick" data-title="Jumanji (1995)">Jumanji (1995)</button>
         </div>
 
-        <div class="search-card__grid">
-          <label class="field field--full" for="data-source">
-            <span class="field-label">Data source</span>
-            <select id="data-source" name="data_source">
-              <option value="demo" selected>Demo catalog (bundled sample)</option>
-              <option value="movielens">MovieLens (requires CINEMATCH_MOVIELENS_DIR)</option>
-            </select>
-          </label>
-
-          <p id="data-source-hint" class="field-hint">
-            <strong>Demo</strong> uses <code>data/sample_movies.csv</code> (or <code>CINEMATCH_DATA_CSV</code>).
-            <strong>MovieLens</strong> reads <code>movies.csv</code> + <code>ratings.csv</code> from the path on the server.
-          </p>
-
-          <label class="field field--grow" for="title-input">
-            <span class="field-label">Movie title</span>
-            <input
-              id="title-input"
-              type="search"
-              name="title"
-              autocomplete="off"
-              placeholder="e.g. Arrival, Jumanji (1995), Toy Story…"
-            />
-          </label>
-
-          <label class="field field--count" for="topk-input">
-            <span class="field-label">Top‑K</span>
-            <input
-              id="topk-input"
-              type="number"
-              min="1"
-              max="20"
-              value="5"
-              inputmode="numeric"
-              title="Number of recommendations (1–20)"
-            />
-          </label>
-        </div>
-
-        <p class="search-card__examples">
-          <span class="search-card__examples-label">Quick tips</span>
-          Demo sample titles include
-          <span class="pill">Arrival</span>,
-          <span class="pill">Paddington 2</span>.
-          Broader titles (e.g. <span class="pill">Jumanji</span>) need <strong>MovieLens</strong> with
-          <code>CINEMATCH_MOVIELENS_DIR</code>. Fixture: <span class="pill">Toy Story</span>.
-        </p>
+        <details class="fine-print">
+          <summary>Fine-tune your night</summary>
+          <div class="fine-print__grid">
+            <label class="field" for="data-source">
+              <span class="field-label">Library</span>
+              <select id="data-source" name="data_source">
+                <option value="demo" selected>Sample Movies</option>
+                <option value="movielens">MovieLens Library</option>
+              </select>
+            </label>
+            <label class="field" for="topk-input">
+              <span class="field-label">Show</span>
+              <select id="topk-input" name="top_k">
+                <option value="5" selected>5 recommendations</option>
+                <option value="10">10 recommendations</option>
+              </select>
+            </label>
+          </div>
+        </details>
 
         <div class="search-card__actions">
-          <button type="button" class="btn btn-primary" id="search-btn">
-            <span class="btn__label">Search</span>
+          <button type="button" class="btn btn-spotlight" id="search-btn">
+            <span aria-hidden="true">✨</span>
+            Get Recommendations
           </button>
-          <a class="btn btn-secondary" href="/docs">Open Swagger</a>
         </div>
       </section>
 
-      <div
-        id="status"
-        class="alert"
-        role="status"
-        aria-live="polite"
-        hidden
-      ></div>
+      <div id="status" class="alert" role="status" aria-live="polite" hidden></div>
 
       <section id="results" class="results" hidden>
-        <header class="results__head">
-          <h2 class="results__title">Results</h2>
-        </header>
+        <p id="because-line" class="because" hidden>
+          <span class="because__prefix">Because you searched for: </span><strong id="because-title"></strong>
+        </p>
 
-        <article class="seed-shell" aria-label="Selected movie">
-          <div class="seed-card">
-            <p class="seed-card__eyebrow">Seed title</p>
-            <p class="seed-card__title" id="seed-title"></p>
-            <p class="seed-card__meta" id="seed-meta"></p>
-          </div>
-        </article>
+        <div class="results__seed-wrap">
+          <article class="poster poster--seed" aria-label="Your pick">
+            <div class="poster__glow" aria-hidden="true"></div>
+            <div class="poster__frame">
+              <div class="poster__canvas poster__canvas--seed" aria-hidden="true"></div>
+              <div class="poster__body">
+                <p class="poster__eyebrow">Your pick</p>
+                <h3 class="poster__title" id="seed-title"></h3>
+                <p class="poster__meta" id="seed-meta"></p>
+              </div>
+            </div>
+          </article>
+        </div>
 
-        <h3 class="results__subtitle">Recommended next</h3>
+        <h3 class="results__heading">More films in the same spirit</h3>
         <ul id="rec-list" class="rec-grid"></ul>
       </section>
     </main>
 
+    <div class="filmstrip filmstrip--bottom" aria-hidden="true"></div>
+
     <footer class="site-footer">
       <span>CineMatch AI</span>
-      <span class="site-footer__dot">·</span>
-      <span>MIT License</span>
+      <a class="site-footer__link" href="/docs">For developers</a>
     </footer>
 
     <script src="/static/js/recommendations.js" defer></script>

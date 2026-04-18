@@ -182,7 +182,7 @@ uvicorn cinematch.main:app --reload --app-dir src
 
 ## Web UI
 
-The home page (`/`) is a **vanilla HTML/CSS/JS** client (no build step) with a centered **hero**, a **search card** (data source, title, top‑K, search), **loading** and **HTTP-aware error** states, and a responsive **results grid**. A **Data source** control lets users pick:
+The home page (`/`) is a **vanilla HTML/CSS/JS** client (no build step) with a **theater-style** layout: spotlight hero, popcorn motif, film-strip accents, ticket “quick pick” chips, a large search bar, and **poster-style** result cards. Catalog choice (**Sample Movies** vs **MovieLens Library**) and how many picks to show live under **Fine-tune your night**. The same JSON APIs power the experience:
 
 | Mode | API used | What you see |
 |------|------------|----------------|
@@ -240,9 +240,10 @@ Add these under **`docs/images/`** (create the folder when you have assets) and 
 1. **Swagger UI** — `http://127.0.0.1:8000/docs` showing the `/api/recommendations/by-title` and `/api/movielens/recommendations/by-title` operations expanded.  
 2. **Terminal sample** — A short session: `curl` call + pretty-printed JSON (or `httpie` / `jq`), demonstrating a 200 response and one error case (`404` or `503`).  
 3. **Architecture** (optional) — A simple diagram: CSV → preprocess → TF–IDF → FastAPI → client.  
-4. **Web UI (desktop)** — Full-width screenshot of `/`: hero, search card, loading or success state, highlighted seed strip, and two-column recommendation cards.  
-5. **Web UI (mobile)** — Narrow viewport showing stacked layout and the same search card.  
-6. **Error states** — Optional captures of the alert for **404** (demo vs MovieLens) and **503** (MovieLens not configured) to show polish.
+4. **Web UI (desktop)** — Save as `assets/ui-demo.png`: full `/` page with theater hero, popcorn, search bar, and ticket quick-picks.  
+5. **Web UI (results)** — Save as `assets/movie-results.png`: “Because you searched for…” line, spotlight seed poster, and poster-style recommendation grid.  
+6. **Web UI (mobile)** — Narrow viewport showing stacked posters and the search card.  
+7. **Error states** — Optional captures of the marquee alert for **404** (“We couldn’t find…”) and **503** (“The full movie library…”) when MovieLens is unavailable.
 
 You can paste the same **example JSON** blocks above into the repo as **`.json` examples** under `docs/examples/` if you want copy-paste fixtures without maintaining screenshots.
 
