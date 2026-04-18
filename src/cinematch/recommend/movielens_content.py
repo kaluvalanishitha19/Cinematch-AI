@@ -10,6 +10,7 @@ from __future__ import annotations
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+from cinematch.data.movielens.preprocess import parse_display_title_and_year
 from cinematch.data.movielens.schema import MLMovie, PreparedMovieLensDataset
 from cinematch.data.preprocess import normalize_whitespace
 
@@ -27,10 +28,19 @@ def ml_movie_to_document(movie: MLMovie) -> str:
 
 
 def find_movie_index_by_title(movies: list[MLMovie], normalized_title: str) -> int | None:
-    """Return the first index whose title matches (case-insensitive)."""
-    needle = normalized_title.lower()
+    """Return the first index whose title matches (case-insensitive).
+
+    Movie rows store the **display title** with the ``(YYYY)`` suffix removed (same
+    rule as ingestion). Users often paste the raw MovieLens title including the
+    year in parentheses, so we also match against that parsed display form.
+    """
+    raw_needle = normalized_title.lower()
+    display_query, _year = parse_display_title_and_year(normalized_title)
+    display_needle = display_query.lower()
+
     for index, movie in enumerate(movies):
-        if movie.title.lower() == needle:
+        title = movie.title.lower()
+        if title == raw_needle or title == display_needle:
             return index
     return None
 

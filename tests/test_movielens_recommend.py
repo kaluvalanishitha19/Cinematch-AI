@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from cinematch.data.movielens import load_prepared_movielens
 from cinematch.data.movielens.cache import clear_movielens_cache
 from cinematch.data.movielens.schema import MLMovie, PreparedMovieLensDataset
 from cinematch.recommend.movielens_content import (
@@ -69,6 +70,22 @@ def test_find_movie_index_by_title_case_insensitive() -> None:
     assert idx == 0
 
 
+def test_find_movie_index_matches_parenthetical_year_like_movielens_csv() -> None:
+    """Raw CSV titles include ``(1995)``; stored ``MLMovie.title`` does not."""
+    movies = load_prepared_movielens(FIXTURE_DIR).movies
+    jumanji_index = next(i for i, m in enumerate(movies) if m.movie_id == "2")
+    assert find_movie_index_by_title(movies, "Jumanji (1995)") == jumanji_index
+    assert find_movie_index_by_title(movies, "jumanji") == jumanji_index
+
+
+def test_recommend_movielens_fixture_accepts_parenthetical_title() -> None:
+    dataset = load_prepared_movielens(FIXTURE_DIR)
+    seed, similar = recommend_movielens_by_title(dataset, "Jumanji (1995)", top_k=2)
+    assert seed.title == "Jumanji"
+    assert seed.movie_id == "2"
+    assert len(similar) >= 1
+
+
 def test_recommend_movielens_by_title_prefers_shared_genres() -> None:
     dataset = _sample_dataset()
     seed, similar = recommend_movielens_by_title(dataset, "Space Epic", top_k=2)
@@ -113,6 +130,27 @@ def test_movielens_api_by_title_uses_fixture(monkeypatch: pytest.MonkeyPatch) ->
     assert body["seed_movie_id"] == "1"
     rec_ids = {movie["movie_id"] for movie in body["recommendations"]}
     assert "1" not in rec_ids
+
+
+def test_movielens_api_accepts_parenthetical_title(monkeypatch: pytest.MonkeyPatch) -> None:
+    from fastapi.testclient import TestClient
+
+    from cinematch.main import app
+
+    monkeypatch.setenv("CINEMATCH_MOVIELENS_DIR", str(FIXTURE_DIR))
+    clear_movielens_cache()
+
+    client = TestClient(app)
+    response = client.get(
+        "/api/movielens/recommendations/by-title",
+        params={"title": "Jumanji (1995)", "top_k": 2},
+    )
+    clear_movielens_cache()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["seed_title"] == "Jumanji"
+    assert body["seed_movie_id"] == "2"
 
 
 def test_movielens_api_returns_503_without_data_dir(monkeypatch: pytest.MonkeyPatch) -> None:

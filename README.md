@@ -104,7 +104,7 @@ Requires **`CINEMATCH_MOVIELENS_DIR`** pointing at a folder that contains **`mov
 
 | Method | Path | Query params | Description |
 |--------|------|--------------|-------------|
-| `GET` | `/api/movielens/recommendations/by-title` | `title` (required), `top_k` default `5` | Content-based neighbors from the prepared MovieLens movie table. |
+| `GET` | `/api/movielens/recommendations/by-title` | `title` (required), `top_k` default `5` | Content-based neighbors from the prepared MovieLens movie table. Title lookup accepts either the **stored display title** (e.g. `Jumanji`) or the **raw MovieLens CSV form** including the year in parentheses (e.g. `Jumanji (1995)`). |
 
 ### Example: demo recommendations by title
 
