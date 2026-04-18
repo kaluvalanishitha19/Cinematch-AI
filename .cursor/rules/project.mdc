@@ -1,0 +1,15 @@
+---
+description: Portfolio project rules
+globs:
+alwaysApply: true
+---
+
+- Keep code beginner-friendly and readable
+- Prefer modular functions over large scripts
+- Explain what files were added or changed
+- Do not generate the whole project at once
+- Implement one milestone at a time
+- Suggest tests for important logic
+- Keep the project GitHub-ready
+- Update README after major features
+- Suggest a clean Git commit message after each milestone
