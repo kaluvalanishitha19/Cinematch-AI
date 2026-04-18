@@ -182,12 +182,14 @@ uvicorn cinematch.main:app --reload --app-dir src
 
 ## Web UI
 
-The home page (`/`) is a small **vanilla HTML/CSS/JS** client (no build step). It calls **`GET /api/recommendations/by-title`** on the **demo catalog** (`data/sample_movies.csv` or `CINEMATCH_DATA_CSV`). It shows:
+The home page (`/`) is a small **vanilla HTML/CSS/JS** client (no build step). A **Data source** control lets users pick:
 
-- the **seed** title and catalog id prominently, and  
-- a **list** of recommended movies (year, genres, short overview).
+| Mode | API used | What you see |
+|------|------------|----------------|
+| **Demo catalog** | `GET /api/recommendations/by-title` | Seed + list with **overview** snippets (`data/sample_movies.csv` or `CINEMATCH_DATA_CSV`). |
+| **MovieLens** | `GET /api/movielens/recommendations/by-title` | Seed + list with **genres, year, ids**, and optional **mean rating / count** (MovieLens has no plot field in the CSV). |
 
-Empty search shows an inline message; **404** / **400** responses show the API `detail` text. The MovieLens-only route is still available at `/api/movielens/...` for API clients; the browser UI does not call it yet.
+Empty search shows an inline message. **404** / **400** show the API `detail`; if **Demo** returns **404** for a title that only exists in MovieLens (for example **Jumanji**), the UI adds a tip to switch **Data source** to **MovieLens** when the server has **`CINEMATCH_MOVIELENS_DIR`** set. If MovieLens is selected but data is missing, **503** responses show a friendly setup message plus the server `detail`. Your last source choice is remembered for the browser tab (**sessionStorage**).
 
 **MovieLens (ml-latest-small) for `/api/movielens/...`**
 

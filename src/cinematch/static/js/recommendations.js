@@ -1,9 +1,12 @@
 /**
- * Simple front-end for GET /api/recommendations/by-title (demo catalog).
- * Keeps logic in one file for beginners; swap API_URL if you add more backends.
+ * Front-end for title-based recommendations: demo catalog or MovieLens.
  */
-const API_URL = "/api/recommendations/by-title";
+const DEMO_API = "/api/recommendations/by-title";
+const MOVIELENS_API = "/api/movielens/recommendations/by-title";
 
+const DATA_SOURCE_STORAGE_KEY = "cinematchDataSource";
+
+const dataSourceEl = document.getElementById("data-source");
 const titleInput = document.getElementById("title-input");
 const topkInput = document.getElementById("topk-input");
 const searchBtn = document.getElementById("search-btn");
@@ -12,6 +15,14 @@ const resultsEl = document.getElementById("results");
 const seedTitleEl = document.getElementById("seed-title");
 const seedMetaEl = document.getElementById("seed-meta");
 const recListEl = document.getElementById("rec-list");
+
+function getSelectedSource() {
+  return dataSourceEl.value === "movielens" ? "movielens" : "demo";
+}
+
+function getApiUrl() {
+  return getSelectedSource() === "movielens" ? MOVIELENS_API : DEMO_API;
+}
 
 function showStatus(message, kind) {
   statusEl.textContent = message;
@@ -69,16 +80,7 @@ function truncate(text, maxLen) {
   return `${clean.slice(0, maxLen - 1)}…`;
 }
 
-function renderRecommendations(items) {
-  recListEl.innerHTML = "";
-  if (!items.length) {
-    const li = document.createElement("li");
-    li.className = "rec-empty";
-    li.textContent = "No other movies in the catalog to suggest yet.";
-    recListEl.appendChild(li);
-    return;
-  }
-
+function renderDemoRecommendations(items) {
   for (const movie of items) {
     const li = document.createElement("li");
     li.className = "rec-card";
@@ -90,7 +92,7 @@ function renderRecommendations(items) {
     const meta = document.createElement("p");
     meta.className = "rec-card__meta";
     const year = movie.year != null ? String(movie.year) : "Year n/a";
-    meta.textContent = `${year} · id ${movie.id}`;
+    meta.textContent = `${year} · id ${movie.id ?? "—"}`;
 
     const genres = document.createElement("div");
     genres.className = "rec-card__genres";
@@ -115,9 +117,81 @@ function renderRecommendations(items) {
   }
 }
 
+function renderMovielensRecommendations(items) {
+  for (const movie of items) {
+    const li = document.createElement("li");
+    li.className = "rec-card";
+
+    const title = document.createElement("p");
+    title.className = "rec-card__title";
+    title.textContent = movie.title || "Untitled";
+
+    const meta = document.createElement("p");
+    meta.className = "rec-card__meta";
+    const year = movie.year != null ? String(movie.year) : "Year n/a";
+    const mid = movie.movie_id ?? "—";
+    let line = `${year} · movie id ${mid}`;
+    if (movie.mean_rating != null && movie.rating_count) {
+      line += ` · avg ${Number(movie.mean_rating).toFixed(2)} (${movie.rating_count} ratings)`;
+    }
+    meta.textContent = line;
+
+    const genres = document.createElement("div");
+    genres.className = "rec-card__genres";
+    for (const g of movie.genres || []) {
+      const chip = document.createElement("span");
+      chip.className = "genre-chip";
+      chip.textContent = g;
+      genres.appendChild(chip);
+    }
+
+    const note = document.createElement("p");
+    note.className = "rec-card__overview rec-card__overview--muted";
+    note.textContent =
+      "MovieLens row (no plot text in this dataset). Similarity uses title, genres, year, and rating summary tokens.";
+
+    li.appendChild(title);
+    li.appendChild(meta);
+    if (genres.childElementCount) {
+      li.appendChild(genres);
+    }
+    li.appendChild(note);
+    recListEl.appendChild(li);
+  }
+}
+
+function renderRecommendations(items, source) {
+  recListEl.innerHTML = "";
+  if (!items.length) {
+    const li = document.createElement("li");
+    li.className = "rec-empty";
+    li.textContent = "No other movies in the catalog to suggest yet.";
+    recListEl.appendChild(li);
+    return;
+  }
+
+  if (source === "movielens") {
+    renderMovielensRecommendations(items);
+  } else {
+    renderDemoRecommendations(items);
+  }
+}
+
+function friendlyError(status, source, detailText) {
+  if (status === 503 && source === "movielens") {
+    return [
+      "MovieLens is not available on this server yet.",
+      "Set environment variable CINEMATCH_MOVIELENS_DIR to the extracted ml-latest-small folder (with movies.csv and ratings.csv), then restart Uvicorn—or pick “Demo catalog” above.",
+      `Server said: ${detailText}`,
+    ].join(" ");
+  }
+  return detailText;
+}
+
 async function runSearch() {
   const title = titleInput.value.trim();
   const topK = clampTopK(topkInput.value);
+  const source = getSelectedSource();
 
   hideResults();
   clearStatus();
@@ -130,13 +204,22 @@ async function runSearch() {
   showStatus("Looking for similar movies…", "info");
 
   const params = new URLSearchParams({ title, top_k: String(topK) });
+  const apiUrl = getApiUrl();
 
   try {
-    const response = await fetch(`${API_URL}?${params.toString()}`);
+    const response = await fetch(`${apiUrl}?${params.toString()}`);
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      const message = formatDetail(data.detail);
+      const detailText = formatDetail(data.detail);
+      let message = friendlyError(response.status, source, detailText);
+      if (response.status === 404 && source === "demo") {
+        message += [
+          "",
+          "The demo catalog is a tiny sample. For titles like Jumanji, switch Data source to MovieLens",
+          "(your server needs CINEMATCH_MOVIELENS_DIR pointing at movies.csv + ratings.csv).",
+        ].join(" ");
+      }
       showStatus(message, "error");
       return;
     }
@@ -145,7 +228,7 @@ async function runSearch() {
     seedTitleEl.textContent = data.seed_title || "Unknown title";
     seedMetaEl.textContent = `Catalog id: ${data.seed_movie_id ?? "—"}`;
 
-    renderRecommendations(Array.isArray(data.recommendations) ? data.recommendations : []);
+    renderRecommendations(Array.isArray(data.recommendations) ? data.recommendations : [], source);
     resultsEl.hidden = false;
   } catch {
     showStatus(
@@ -163,3 +246,25 @@ titleInput.addEventListener("keydown", (event) => {
     runSearch();
   }
 });
+
+function restoreDataSourcePreference() {
+  try {
+    const saved = window.sessionStorage.getItem(DATA_SOURCE_STORAGE_KEY);
+    if (saved === "movielens" || saved === "demo") {
+      dataSourceEl.value = saved;
+    }
+  } catch {
+    /* private mode or blocked storage — ignore */
+  }
+}
+
+function rememberDataSourcePreference() {
+  try {
+    window.sessionStorage.setItem(DATA_SOURCE_STORAGE_KEY, dataSourceEl.value);
+  } catch {
+    /* ignore */
+  }
+}
+
+dataSourceEl.addEventListener("change", rememberDataSourcePreference);
+restoreDataSourcePreference();
