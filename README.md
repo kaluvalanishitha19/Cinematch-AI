@@ -1,272 +1,212 @@
-# CineMatch AI
+# CineMatch AI 🎬🍿
 
-**FastAPI + scikit-learn** portfolio project: load movie catalogs, preprocess **MovieLens-style** CSVs, and serve **content-based** recommendations with **TF–IDF** and **cosine similarity**. The codebase is split into small modules (data loading, preprocessing, recommendation, HTTP) so it is easy to extend toward **collaborative filtering** or a richer UI later.
+CineMatch AI is a movie recommendation web app that helps users discover similar movies based on genre and content similarity.
 
----
+Users can search for a movie they like, choose how many recommendations they want, and instantly get a list of related films through a clean, movie-themed interface.
 
-## Table of contents
-
-1. [Project overview](#project-overview)  
-2. [Architecture](#architecture)  
-3. [MovieLens preprocessing](#movielens-preprocessing)  
-4. [How TF–IDF recommendations work](#how-tf-idf-recommendations-work)  
-5. [API reference](#api-reference)  
-6. [Setup and run](#setup-and-run)  
-7. [Web UI](#web-ui)  
-8. [Testing and quality](#testing-and-quality)  
-9. [Suggested screenshots and sample output](#suggested-screenshots-and-sample-output)  
-10. [Roadmap](#roadmap)  
-11. [License](#license)
+This project was built as an end-to-end AI/ML portfolio project with a working recommendation engine, FastAPI backend, interactive frontend, MovieLens dataset support, and automated tests.
 
 ---
 
-## Project overview
+## ✨ Features
 
-| | |
-|--|--|
-| **Goal** | Demonstrate an end-to-end ML-adjacent service: validated data ingestion, text vectorization, ranking, and a documented HTTP API. |
-| **What ships today** | Two **content-based** paths: a **tiny demo CSV** (about half a dozen titles bundled for screenshots) and an optional **MovieLens** export (`movies.csv` + `ratings.csv`) for realistic testing. |
-| **What is out of scope (for now)** | User accounts, training pipelines, collaborative filtering, and production deployment hardening. |
-
-**Stack:** Python 3.11+, FastAPI, Pydantic v2, Uvicorn, scikit-learn, pytest.
-
----
-
-## Architecture
-
-- **`cinematch.data`** — Load and clean data (`loader`, `pipeline`, `preprocess`), plus a **`movielens`** subpackage for MovieLens CSV layout, merges, and optional LRU **cache**.  
-- **`cinematch.recommend`** — Pure recommendation helpers: demo **`content`** (overview + genres) and **`movielens_content`** (title + genres + year + rating summaries).  
-- **`cinematch.api`** — HTTP routers under `/api` (demo catalog) and `/api/movielens` (MovieLens-backed route).  
-- **`cinematch.static`** — Portfolio-style landing UI at `/` (hero, search card, results) calling demo or MovieLens APIs from the browser.
+- Search for movies and get similar recommendations
+- Supports both a small sample catalog and the full MovieLens dataset
+- Content-based recommendation using TF-IDF similarity
+- FastAPI backend with documented API routes
+- Responsive movie-themed web interface
+- User-friendly error handling
+- Unit tests for data loading, preprocessing, recommendation logic, API routes, and UI behavior
+- Large dataset files excluded from GitHub using `.gitignore`
 
 ---
 
-## MovieLens preprocessing
+## 🧠 How It Works
 
-MovieLens exports (for example **ml-latest-small**) use two files in one directory:
+CineMatch AI uses a content-based recommendation approach.
+
+The system loads movie data, cleans and preprocesses the catalog, extracts useful movie features such as title, year, genres, and rating statistics, and then uses TF-IDF based similarity to find related movies.
+
+When a user searches for a movie such as **Jumanji (1995)**, the system compares its content features with other movies and returns recommendations with similar genre and content patterns.
+
+---
+
+## 🛠️ Tech Stack
+
+- **Python**
+- **FastAPI**
+- **Pydantic**
+- **Scikit-learn**
+- **Pandas**
+- **HTML**
+- **CSS**
+- **JavaScript**
+- **Pytest**
+- **MovieLens Dataset**
+
+---
+
+## 📁 Project Structure
 
 ```text
-your-ml-folder/
-  movies.csv     # movieId, title, genres (genres separated by |)
-  ratings.csv    # userId, movieId, rating, timestamp
+cinematch-ai/
+│
+├── src/
+│   └── cinematch/
+│       ├── api/              # FastAPI routes
+│       ├── data/             # Data loading and preprocessing
+│       ├── recommend/        # Recommendation logic
+│       ├── static/           # Frontend UI files
+│       └── main.py           # FastAPI app entry point
+│
+├── tests/                    # Unit and API tests
+├── data/                     # Local data folder
+├── README.md
+├── .gitignore
+└── pyproject.toml
 ```
-
-**End-to-end flow** (see `cinematch.data.movielens`):
-
-1. **Read CSVs** — UTF-8 with optional BOM; required columns are validated on the header.  
-2. **Clean movies** — Skip rows with empty `movieId` or empty display title. Genres split on `|`; `(no genres listed)` becomes an empty list. Titles like `Toy Story (1995)` become display title plus parsed **year** when the trailing `(YYYY)` pattern matches.  
-3. **Clean ratings** — Skip rows with missing ids or ratings; ratings must parse as floats in **0.5–5.0** (MovieLens scale). Bad or empty timestamps become `null` in the model rather than failing the whole file.  
-4. **Align ids** — Drop ratings whose `movieId` never appears in `movies.csv` (orphans).  
-5. **Aggregate** — For each movie, compute **mean rating** and **rating count** from the surviving ratings; movies with no ratings keep `mean_rating` unset and `rating_count` at zero.  
-6. **Catalog hygiene** — Duplicate `movieId` rows keep the **first** occurrence; movies are sorted by numeric id when possible.
-
-Load in code with `load_prepared_movielens(Path("…"))` or set **`CINEMATCH_MOVIELENS_DIR`** to that folder (also used by the MovieLens API route and the LRU cache).
 
 ---
 
-## How TF–IDF recommendations work
+## 🚀 How to Run the Project Locally
 
-Both recommenders follow the same pattern; only the **text fed into TF–IDF** changes.
+Follow these steps to run CineMatch AI on your machine.
 
-1. **Document** — Each movie becomes one string (see `movie_to_document` vs `ml_movie_to_document`).  
-2. **Vectorize** — `TfidfVectorizer` (scikit-learn) with English **stop words** removed, **`min_df=1`** so small catalogs still work, and **`ngram_range=(1, 2)`** so single words and short phrases both contribute.  
-3. **Score** — **Cosine similarity** compares the seed movie’s vector to every other movie’s vector.  
-4. **Rank** — Sort by similarity, skip the seed, return the top **`top_k`**.
+### Step 1: Clone the repository
 
-| Mode | Source rows | Document text roughly contains |
-|------|----------------|----------------------------------|
-| **Demo catalog** | `Movie` from `data/sample_movies.csv` | Genres + **overview** body copy. |
-| **MovieLens catalog** | `MLMovie` after preprocessing | **Title**, **genres**, **year**, and optional tokens derived from **mean rating** and **rating count** (so popularity-ish signal can influence word overlap). |
+```bash
+git clone https://github.com/kaluvalanishitha19/Cinematch-AI.git
+cd Cinematch-AI
+```
 
-This is **content-based**, not personalized from a user’s full rating history: similar movies are those whose *text profile* is close to the seed. Collaborative filtering would use the `ratings` table directly; that is a natural next step, not implemented here.
+### Step 2: Create a virtual environment
+
+```bash
+python3 -m venv .venv
+```
+
+### Step 3: Activate the virtual environment
+
+For macOS/Linux:
+
+```bash
+source .venv/bin/activate
+```
+
+For Windows:
+
+```bash
+.venv\Scripts\activate
+```
+
+### Step 4: Install dependencies
+
+```bash
+pip install -e .
+```
+
+### Step 5: Run the app with sample data
+
+```bash
+uvicorn cinematch.main:app --reload --app-dir src
+```
+
+### Step 6: Open the app in your browser
+
+```text
+http://127.0.0.1:8000/
+```
+
+This runs the app using the small sample movie catalog included in the repository.
 
 ---
 
-## API reference
+## 🎞️ Running with the Full MovieLens Dataset
 
-Interactive docs: **`http://127.0.0.1:8000/docs`** (Swagger UI).
+The full MovieLens dataset is not included in this repository because large data files should not be pushed to GitHub.
 
-### Demo catalog (`/api` …)
+To use the full movie library, download the MovieLens `ml-latest-small` dataset and place the required files inside the `data/` folder.
 
-Uses **`CINEMATCH_DATA_CSV`** if set, otherwise **`data/sample_movies.csv`**.
+Your folder should look like this:
 
-| Method | Path | Query / path params | Description |
-|--------|------|----------------------|-------------|
-| `GET` | `/api/health` | — | `{ "status": "ok" }` |
-| `GET` | `/api/movies` | — | List all movies. |
-| `GET` | `/api/movies/{movie_id}` | path: `movie_id` | One movie; `404` if missing. |
-| `GET` | `/api/recommendations` | `movie_id` (required), `top_k` default `5` | Similar movies by id. |
-| `GET` | `/api/recommendations/by-title` | `title` (required), `top_k` default `5` | Match title (case-insensitive, trimmed); `400` empty title; `404` no match. |
-
-### MovieLens catalog (`/api/movielens` …)
-
-Requires **`CINEMATCH_MOVIELENS_DIR`** pointing at a folder that contains **`movies.csv`** and **`ratings.csv`** next to each other (same layout as GroupLens **ml-latest-small**). Returns **`503`** if the variable is unset, the path is missing, or the CSVs cannot be read or parsed.
-
-| Method | Path | Query params | Description |
-|--------|------|--------------|-------------|
-| `GET` | `/api/movielens/recommendations/by-title` | `title` (required), `top_k` default `5` | Content-based neighbors from the prepared MovieLens movie table. Title lookup accepts either the **stored display title** (e.g. `Jumanji`) or the **raw MovieLens CSV form** including the year in parentheses (e.g. `Jumanji (1995)`). |
-
-### Example: demo recommendations by title
-
-**Request**
-
-```http
-GET /api/recommendations/by-title?title=Arrival&top_k=2
+```text
+data/
+├── movies.csv
+├── ratings.csv
+└── sample_movies.csv
 ```
 
-**Example response** (shape from the bundled sample; exact neighbors depend on TF–IDF scores)
+Then run:
+
+```bash
+export CINEMATCH_MOVIELENS_DIR="$(pwd)/data"
+uvicorn cinematch.main:app --reload --app-dir src
+```
+
+In the web app, choose **Full Movie Library** and search titles such as:
+
+```text
+Toy Story (1995)
+Jumanji (1995)
+Heat (1995)
+Apollo 13 (1995)
+Braveheart (1995)
+Casino (1995)
+```
+
+---
+
+## 🔌 API Documentation
+
+FastAPI provides interactive API documentation at:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+### MovieLens Recommendation Endpoint
+
+```text
+GET /api/movielens/recommendations/by-title?title=Jumanji%20(1995)&top_k=5
+```
+
+### Example Response
 
 ```json
 {
-  "seed_title": "Arrival",
   "seed_movie_id": "2",
+  "seed_title": "Jumanji",
   "recommendations": [
     {
-      "id": "5",
-      "title": "Mad Max Fury Road",
-      "year": 2015,
-      "genres": ["Action", "Adventure", "Sci-Fi"],
-      "overview": "Survivors flee across a desert wasteland pursued by a warlord and his army."
-    }
-  ]
-}
-```
-
-### Example: MovieLens recommendations by title
-
-**Request** (after `export CINEMATCH_MOVIELENS_DIR=…`)
-
-```http
-GET /api/movielens/recommendations/by-title?title=Toy%20Story&top_k=3
-```
-
-**Example response** (fields reflect `MLMovie`; list truncated for readability)
-
-```json
-{
-  "seed_movie_id": "1",
-  "seed_title": "Toy Story",
-  "recommendations": [
-    {
-      "movie_id": "…",
-      "title": "…",
+      "movie_id": "1",
+      "title": "Toy Story",
       "year": 1995,
       "genres": ["Adventure", "Animation", "Children"],
-      "mean_rating": 3.89,
-      "rating_count": 57309
+      "mean_rating": 3.9,
+      "rating_count": 215
     }
   ]
 }
 ```
 
-Exact `recommendations` depend on your MovieLens slice and TF–IDF scores.
-
 ---
 
-## Setup and run
+## 🧪 Running Tests
 
-**Prerequisites:** Python **3.11+**, `pip`, and optionally a MovieLens **ml-latest-small** (or compatible) unzip if you want the **Full Movie Library** option in the UI (backed by `/api/movielens/...`) in addition to the bundled quick demo.
+To run the full test suite:
 
 ```bash
-cd cinematch-ai
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
-uvicorn cinematch.main:app --reload --app-dir src
+pytest -q
 ```
 
-- **Web app:** [http://127.0.0.1:8000](http://127.0.0.1:8000)  
-- **API docs:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+The project includes tests for:
+
+- Data loading
+- Data preprocessing
+- MovieLens dataset handling
+- Recommendation logic
+- API responses
+- Static UI behavior
+- Missing dataset handling
 
 ---
-
-## Web UI
-
-The home page (`/`) is a **vanilla HTML/CSS/JS** client (no build step) with a **theater-style** layout: spotlight hero, popcorn motif, film-strip accents, ticket “quick pick” chips, a large search bar, and **ticket-style recommendation cards** (title, year, genres, optional ratings, short tag line). There are **no poster images or poster-shaped placeholders**—only typography and layout. In the UI, **Quick Demo** vs **Full Movie Library** (and how many picks to show) live under a small **More options** disclosure—copy stays consumer-friendly; **dataset and server setup are documented only here**, not in the main page.
-
-| UI label | API used | What you see |
-|----------|------------|----------------|
-| **Quick Demo** | `GET /api/recommendations/by-title` | A **small fixed demo** (`data/sample_movies.csv` or `CINEMATCH_DATA_CSV`). Lists are **short by design**. |
-| **Full Movie Library** | `GET /api/movielens/recommendations/by-title` | Large catalog when **`CINEMATCH_MOVIELENS_DIR`** points at **ml-latest-small** (see below): genres, year, ids, optional **mean rating / count** (MovieLens CSV has no plot field). |
-
-**Choosing a catalog (technical)**
-
-- **Quick Demo** — Bundled **six-title** CSV; quick picks match those rows.  
-- **Full Movie Library** — Requires **`CINEMATCH_MOVIELENS_DIR`** and an extracted **ml-latest-small** folder (see below). If that path is not configured or the server returns **503**, the UI **falls back to Quick Demo** for the same search and shows a short, non-technical message—users are not asked to fix environment variables on the home page.
-
-Empty search shows an inline message. **404** uses friendly copy in the marquee. Your last source choice is remembered for the browser tab (**sessionStorage**).
-
-### Downloading MovieLens **ml-latest-small** (recommended)
-
-These steps use the official **GroupLens** release (free, no API key). Nothing large is committed to GitHub—you download it locally.
-
-1. Open **[MovieLens Latest Datasets](https://grouplens.org/datasets/movielens/latest/)** in your browser.  
-2. Download **`ml-latest-small.zip`** (about 1 MB; “small” means smaller than the full MovieLens dumps, not “small feature set”).  
-3. **Unzip** the archive. You should see a folder named **`ml-latest-small`**. Inside it, **`movies.csv`** and **`ratings.csv`** must sit **in the same directory** (not only inside nested archives).  
-4. **Set the environment variable** to the **absolute path** of that folder (adjust the path for your machine):
-
-```bash
-export CINEMATCH_MOVIELENS_DIR="/absolute/path/to/ml-latest-small"
-uvicorn cinematch.main:app --reload --app-dir src
-```
-
-5. In the web UI, open **More options** → choose **Full Movie Library** → use quick picks or search (e.g. **Toy Story (1995)**).
-
-If the path is wrong or the CSVs are missing, `/api/movielens/recommendations/by-title` responds with **`503`** and a JSON `detail` string explaining that `movies.csv` / `ratings.csv` were not found or could not be parsed.
-
-**Developer / CI quick path (tiny fixture)**
-
-The repo includes **`tests/fixtures/movielens/`** with minimal `movies.csv` and `ratings.csv` for automated tests. You can point your shell at it while developing the MovieLens API (titles in that file include **Toy Story**):
-
-```bash
-export CINEMATCH_MOVIELENS_DIR="$(pwd)/tests/fixtures/movielens"
-uvicorn cinematch.main:app --reload --app-dir src
-```
-
-**Uvicorn entrypoint:** use `cinematch.main:app` with `--app-dir src` (not `src.cinematch.api.main`), so imports match this repository layout.
-
-**Optional — custom demo CSV**
-
-```bash
-export CINEMATCH_DATA_CSV="/path/to/your_movies.csv"
-# columns: id, title, year, genres, overview
-```
-
----
-
-## Testing and quality
-
-```bash
-pytest
-ruff check src tests
-```
-
----
-
-## Suggested screenshots and sample output
-
-Add these under **`docs/images/`** (create the folder when you have assets) and link them from this README—recruiters often skim visuals first.
-
-1. **Swagger UI** — `http://127.0.0.1:8000/docs` showing the `/api/recommendations/by-title` and `/api/movielens/recommendations/by-title` operations expanded.  
-2. **Terminal sample** — A short session: `curl` call + pretty-printed JSON (or `httpie` / `jq`), demonstrating a 200 response and one error case (`404` or `503`).  
-3. **Architecture** (optional) — A simple diagram: CSV → preprocess → TF–IDF → FastAPI → client.  
-4. **Web UI (desktop)** — Save as `assets/ui-demo.png`: full `/` page with theater hero, popcorn, search bar, and ticket quick-picks.  
-5. **Web UI (results)** — Save as `assets/movie-results.png`: “Because you searched for…” line, your-pick ticket card, and stacked recommendation info cards.  
-6. **Web UI (mobile)** — Narrow viewport showing stacked ticket cards and the search card.  
-7. **Error states** — Optional capture of the **404** marquee (“We couldn’t find…”), or the brief info line when the app **falls back to Quick Demo** after the full library is unavailable.
-
-You can paste the same **example JSON** blocks above into the repo as **`.json` examples** under `docs/examples/` if you want copy-paste fixtures without maintaining screenshots.
-
----
-
-## Roadmap
-
-- Collaborative or hybrid models using `PreparedMovieLensDataset.ratings`.  
-- Integrate TMDB API for artwork, cast, and richer metadata.  
-- Docker and CI (GitHub Actions) for install + `pytest` on push.
-
----
-
-## License
-
-MIT — see [LICENSE](LICENSE).
